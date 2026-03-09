@@ -43,12 +43,13 @@
           "snapshotPrice": 22495
         },
         {
-          "ticker": "441640",
+          "ticker": "MANUAL-KODEX-INFERRED-01",
           "name": "KODEX 미국성장커버드콜액티브",
           "type": "ETF",
           "quantity": 1000,
           "costBasis": 9927070,
           "snapshotPrice": 9320,
+          "manualPriceOnly": true,
           "nameInferred": true
         },
         {
@@ -71,7 +72,241 @@
       "notes": [
         {
           "label": "KODEX 미국성장커버드콜액티브",
-          "text": "명칭은 스크린샷에서 축약된 텍스트를 바탕으로 보완한 값입니다."
+          "text": "명칭은 스크린샷에서 축약된 텍스트를 바탕으로 보완한 값이며, 정확한 종목코드는 확인 전까지 수동 가격으로 유지합니다."
+        }
+      ]
+    },
+    {
+      "id": "retirement-pension",
+      "name": "퇴직연금",
+      "snapshotLabel": "2026년 3월 9일 22:28 스크린샷 기준",
+      "cash": 307,
+      "holdings": [
+        {
+          "ticker": "251600",
+          "name": "PLUS 고배당주채권혼합",
+          "type": "혼합형",
+          "quantity": 490,
+          "costBasis": 6058100,
+          "snapshotPrice": 15400
+        },
+        {
+          "ticker": "088980",
+          "name": "맥쿼리인프라",
+          "type": "인프라",
+          "quantity": 643,
+          "costBasis": 7350687,
+          "snapshotPrice": 11240
+        },
+        {
+          "ticker": "458730",
+          "name": "TIGER 미국배당다우존스",
+          "type": "ETF",
+          "quantity": 367,
+          "costBasis": 4497920,
+          "snapshotPrice": 14540
+        },
+        {
+          "ticker": "415640",
+          "name": "KB발해인프라",
+          "type": "인프라",
+          "quantity": 248,
+          "costBasis": 1985850,
+          "snapshotPrice": 10020
+        },
+        {
+          "ticker": "458760",
+          "name": "TIGER 미국배당다우존스타겟커버드콜2호",
+          "type": "ETF",
+          "quantity": 139,
+          "costBasis": 1491025,
+          "snapshotPrice": 11220,
+          "nameInferred": true
+        },
+        {
+          "ticker": "441640",
+          "name": "KODEX 미국배당커버드콜액티브",
+          "type": "ETF",
+          "quantity": 37,
+          "costBasis": 445245,
+          "snapshotPrice": 12810,
+          "nameInferred": true
+        }
+      ],
+      "notes": [
+        {
+          "label": "자동운용상품(고유계정대)",
+          "text": "307원은 요청대로 원화현금과 동일하게 처리했습니다."
+        },
+        {
+          "label": "TIGER 미국배당다우존스...",
+          "text": "잘린 텍스트는 스크린샷과 가격대를 기준으로 TIGER 미국배당다우존스타겟커버드콜2호로 추정했습니다."
+        },
+        {
+          "label": "KODEX 미국배당커버드...",
+          "text": "잘린 텍스트는 스크린샷과 가격대를 기준으로 KODEX 미국배당커버드콜액티브로 추정했습니다."
+        }
+      ]
+    },
+    {
+      "id": "isa",
+      "name": "ISA",
+      "snapshotLabel": "2026년 3월 9일 22:36 스크린샷 2장 기준",
+      "cash": 0,
+      "holdings": [
+        {
+          "ticker": "017670",
+          "name": "SK텔레콤",
+          "type": "주식",
+          "quantity": 249,
+          "costBasis": 13308300,
+          "snapshotPrice": 75800
+        },
+        {
+          "ticker": "458760",
+          "name": "TIGER 미국배당다우존스타겟커버드콜2호",
+          "type": "ETF",
+          "quantity": 1376,
+          "costBasis": 13870080,
+          "snapshotPrice": 11220,
+          "nameInferred": true
+        },
+        {
+          "ticker": "005385",
+          "name": "현대차우",
+          "type": "우선주",
+          "quantity": 51,
+          "costBasis": 10531500,
+          "snapshotPrice": 253500
+        },
+        {
+          "ticker": "088980",
+          "name": "맥쿼리인프라",
+          "type": "인프라",
+          "quantity": 1010,
+          "costBasis": 11718930,
+          "snapshotPrice": 11240
+        },
+        {
+          "ticker": "086790",
+          "name": "하나금융지주",
+          "type": "주식",
+          "quantity": 90,
+          "costBasis": 8286600,
+          "snapshotPrice": 107900
+        },
+        {
+          "ticker": "458730",
+          "name": "TIGER 미국배당다우존스",
+          "type": "ETF",
+          "quantity": 597,
+          "costBasis": 7799805,
+          "snapshotPrice": 14540
+        },
+        {
+          "ticker": "441640",
+          "name": "KODEX 미국배당커버드콜액티브",
+          "type": "ETF",
+          "quantity": 506,
+          "costBasis": 6495406,
+          "snapshotPrice": 12810,
+          "nameInferred": true
+        },
+        {
+          "ticker": "005389",
+          "name": "현대차3우B",
+          "type": "우선주",
+          "quantity": 24,
+          "costBasis": 5145000,
+          "snapshotPrice": 239000
+        },
+        {
+          "ticker": "0098N0",
+          "name": "PLUS 자사주매입고배당주",
+          "type": "ETF",
+          "quantity": 407,
+          "costBasis": 4525840,
+          "snapshotPrice": 12400
+        },
+        {
+          "ticker": "476800",
+          "name": "KODEX 한국부동산리츠인프라",
+          "type": "ETF",
+          "quantity": 883,
+          "costBasis": 4282550,
+          "snapshotPrice": 4770,
+          "nameInferred": true
+        },
+        {
+          "ticker": "316140",
+          "name": "우리금융지주",
+          "type": "주식",
+          "quantity": 105,
+          "costBasis": 2890125,
+          "snapshotPrice": 31550
+        },
+        {
+          "ticker": "003545",
+          "name": "대신증권우",
+          "type": "우선주",
+          "quantity": 125,
+          "costBasis": 2600000,
+          "snapshotPrice": 25100
+        },
+        {
+          "ticker": "418660",
+          "name": "TIGER 미국나스닥100레버리지(합성)",
+          "type": "ETF",
+          "quantity": 79,
+          "costBasis": 2683710,
+          "snapshotPrice": 33085
+        },
+        {
+          "ticker": "0052D0",
+          "name": "TIGER 코리아배당다우존스",
+          "type": "ETF",
+          "quantity": 142,
+          "costBasis": 1921970,
+          "snapshotPrice": 15390,
+          "nameInferred": true
+        },
+        {
+          "ticker": "415640",
+          "name": "KB발해인프라",
+          "type": "인프라",
+          "quantity": 200,
+          "costBasis": 1944000,
+          "snapshotPrice": 10020
+        },
+        {
+          "ticker": "024110",
+          "name": "기업은행",
+          "type": "주식",
+          "quantity": 71,
+          "costBasis": 1480350,
+          "snapshotPrice": 22800
+        }
+      ],
+      "notes": [
+        {
+          "label": "현금/예수금",
+          "text": "제공된 2장 스크린샷에는 현금 항목이 보이지 않아 우선 0원으로 처리했습니다."
+        },
+        {
+          "label": "TIGER 미국배당다우존스...",
+          "text": "잘린 텍스트와 주당 가격 11,220원을 기준으로 TIGER 미국배당다우존스타겟커버드콜2호로 정리했습니다."
+        },
+        {
+          "label": "KODEX 미국배당커버드...",
+          "text": "잘린 텍스트와 주당 가격 12,810원을 기준으로 KODEX 미국배당커버드콜액티브로 정리했습니다."
+        },
+        {
+          "label": "TIGER 미국나스닥100...",
+          "text": "종목은 TIGER 미국나스닥100레버리지(합성)으로 정정했습니다."
+        },
+        {
+          "label": "TIGER 코리아배당다우...",
+          "text": "잘린 텍스트는 TIGER 코리아배당다우존스로 정리했습니다."
         }
       ]
     }

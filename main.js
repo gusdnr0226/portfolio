@@ -96,7 +96,8 @@ function buildPortfolioData(source, livePriceSource) {
     Boolean(livePriceSource) && livePriceSource.provider !== "snapshot-fallback";
 
   const enrichedHoldings = source.holdings.map((holding) => {
-    const liveQuote = hasExternalQuotes ? quotes[holding.ticker] : null;
+    const liveQuote =
+      hasExternalQuotes && !holding.manualPriceOnly ? quotes[holding.ticker] : null;
     const currentPrice = Number.isFinite(liveQuote?.price)
       ? liveQuote.price
       : holding.snapshotPrice;
@@ -111,7 +112,11 @@ function buildPortfolioData(source, livePriceSource) {
       profitLoss,
       profitRate,
       averageCost: holding.costBasis / holding.quantity,
-      priceSource: liveQuote ? "live" : "snapshot",
+      priceSource: holding.manualPriceOnly
+        ? "manual"
+        : liveQuote
+          ? "live"
+          : "snapshot",
     };
   });
 
@@ -330,7 +335,11 @@ function renderTableRows(portfolio) {
             <div class="asset-meta">
               <span class="tag">${holding.type}</span>
               <span class="tag ${holding.priceSource === "live" ? "tag-live" : "tag-warning"}">
-                ${holding.priceSource === "live" ? "자동 시세" : "스냅샷"}
+                ${holding.priceSource === "live"
+                  ? "자동 시세"
+                  : holding.priceSource === "manual"
+                    ? "수동 가격"
+                    : "스냅샷"}
               </span>
               ${holding.nameInferred ? '<span class="tag tag-warning">이름 추정</span>' : ""}
             </div>
@@ -339,7 +348,11 @@ function renderTableRows(portfolio) {
           <td>
             <div class="metric">
               <strong>${formatPrice(holding.currentPrice)}</strong>
-              <span>${holding.priceSource === "live" ? "외부 시세 반영" : "스크린샷 기준"}</span>
+              <span>${holding.priceSource === "live"
+                ? "외부 시세 반영"
+                : holding.priceSource === "manual"
+                  ? "수동 기준 가격"
+                  : "스크린샷 기준"}</span>
             </div>
           </td>
           <td>${formatAverageCost(holding.averageCost)}</td>

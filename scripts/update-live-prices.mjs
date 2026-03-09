@@ -24,6 +24,10 @@ function uniqueHoldings(accounts) {
   return [...seen.values()];
 }
 
+function shouldFetchLiveQuote(holding) {
+  return /^[0-9A-Z]{6}$/.test(holding.ticker) && !holding.manualPriceOnly;
+}
+
 async function readJson(filePath) {
   return JSON.parse(await readFile(filePath, "utf8"));
 }
@@ -114,6 +118,14 @@ async function main() {
   const quotes = {};
 
   for (const holding of holdings) {
+    if (!shouldFetchLiveQuote(holding)) {
+      quotes[holding.ticker] = {
+        price:
+          existingLivePrices?.quotes?.[holding.ticker]?.price ?? holding.snapshotPrice
+      };
+      continue;
+    }
+
     try {
       const price = await fetchCurrentPrice({
         accessToken,
