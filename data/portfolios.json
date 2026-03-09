@@ -25,8 +25,7 @@
           "costBasis": 6163390,
           "snapshotPrice": 12390
         }
-      ],
-      "notes": []
+      ]
     },
     {
       "id": "pension-savings-2",
@@ -68,12 +67,6 @@
           "costBasis": 1562420,
           "snapshotPrice": 11240
         }
-      ],
-      "notes": [
-        {
-          "label": "KODEX 미국성장커버드콜액티브",
-          "text": "명칭은 스크린샷에서 축약된 텍스트를 바탕으로 보완한 값이며, 정확한 종목코드는 확인 전까지 수동 가격으로 유지합니다."
-        }
       ]
     },
     {
@@ -90,17 +83,11 @@
           "costBasis": 6237720,
           "snapshotPrice": 13300
         }
-      ],
-      "notes": [
-        {
-          "label": "현금/예수금",
-          "text": "현금 정보는 전달되지 않아 우선 0원으로 처리했습니다."
-        }
       ]
     },
     {
-      "id": "retirement-pension",
-      "name": "퇴직연금",
+      "id": "retirement-pension-hyeonuk",
+      "name": "퇴직연금(현욱)",
       "snapshotLabel": "2026년 3월 9일 22:28 스크린샷 기준",
       "cash": 307,
       "holdings": [
@@ -154,19 +141,47 @@
           "snapshotPrice": 12810,
           "nameInferred": true
         }
-      ],
-      "notes": [
+      ]
+    },
+    {
+      "id": "retirement-pension-ingyeong",
+      "name": "퇴직연금(인경)",
+      "snapshotLabel": "2026년 3월 9일 22:58 스크린샷 기준",
+      "cash": 0,
+      "holdings": [
         {
-          "label": "자동운용상품(고유계정대)",
-          "text": "307원은 요청대로 원화현금과 동일하게 처리했습니다."
+          "ticker": "379810",
+          "name": "KODEX 미국나스닥100",
+          "type": "ETF",
+          "quantity": 101,
+          "costBasis": 2092821,
+          "snapshotPrice": 24080
         },
         {
-          "label": "TIGER 미국배당다우존스...",
-          "text": "잘린 텍스트는 스크린샷과 가격대를 기준으로 TIGER 미국배당다우존스타겟커버드콜2호로 추정했습니다."
+          "ticker": "390390",
+          "name": "KODEX 미국반도체",
+          "type": "ETF",
+          "quantity": 27,
+          "costBasis": 983826,
+          "snapshotPrice": 37900
         },
         {
-          "label": "KODEX 미국배당커버드...",
-          "text": "잘린 텍스트는 스크린샷과 가격대를 기준으로 KODEX 미국배당커버드콜액티브로 추정했습니다."
+          "ticker": "438080",
+          "name": "ACE 미국S&P500미국채혼합50액티브",
+          "type": "혼합형",
+          "quantity": 69,
+          "costBasis": 897966,
+          "snapshotPrice": 13995,
+          "nameInferred": true
+        },
+        {
+          "ticker": "0038A0",
+          "name": "KODEX 미국휴머노이드로봇",
+          "type": "ETF",
+          "quantity": 60,
+          "costBasis": 986100,
+          "snapshotPrice": 15545,
+          "nameInferred": true
         }
       ]
     },
@@ -307,28 +322,6 @@
           "quantity": 71,
           "costBasis": 1480350,
           "snapshotPrice": 22800
-        }
-      ],
-      "notes": [
-        {
-          "label": "현금/예수금",
-          "text": "제공된 2장 스크린샷에는 현금 항목이 보이지 않아 우선 0원으로 처리했습니다."
-        },
-        {
-          "label": "TIGER 미국배당다우존스...",
-          "text": "잘린 텍스트와 주당 가격 11,220원을 기준으로 TIGER 미국배당다우존스타겟커버드콜2호로 정리했습니다."
-        },
-        {
-          "label": "KODEX 미국배당커버드...",
-          "text": "잘린 텍스트와 주당 가격 12,810원을 기준으로 KODEX 미국배당커버드콜액티브로 정리했습니다."
-        },
-        {
-          "label": "TIGER 미국나스닥100...",
-          "text": "종목은 TIGER 미국나스닥100레버리지(합성)으로 정정했습니다."
-        },
-        {
-          "label": "TIGER 코리아배당다우...",
-          "text": "잘린 텍스트는 TIGER 코리아배당다우존스로 정리했습니다."
         }
       ]
     }

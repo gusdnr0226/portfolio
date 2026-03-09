@@ -137,13 +137,13 @@ function buildPortfolioData(source, livePriceSource) {
   );
 
   const totalAssets = totals.marketValue + source.cash;
-  const investedWeight = totals.marketValue / totalAssets;
-  const cashWeight = source.cash / totalAssets;
+  const investedWeight = totalAssets === 0 ? 0 : totals.marketValue / totalAssets;
+  const cashWeight = totalAssets === 0 ? 0 : source.cash / totalAssets;
   const totalReturn = totals.costBasis === 0 ? 0 : totals.profitLoss / totals.costBasis;
 
   const holdingsWithWeight = enrichedHoldings.map((holding) => ({
     ...holding,
-    assetWeight: holding.marketValue / totalAssets,
+    assetWeight: totalAssets === 0 ? 0 : holding.marketValue / totalAssets,
   }));
 
   return {
@@ -309,19 +309,95 @@ function renderBookSummaryCards(book) {
     .join("");
 }
 
-function renderAccountJumpLinks(book) {
+function getTopHoldings(portfolio, limit = 3) {
+  return [...portfolio.holdings]
+    .sort((left, right) => right.marketValue - left.marketValue)
+    .slice(0, limit);
+}
+
+function renderAccountOverviewCards(book) {
   return book.portfolios
-    .map(
-      (portfolio) => `
-        <a class="account-jump" href="#${portfolio.id}">
-          <span class="account-jump-name">${portfolio.name}</span>
-          <strong class="account-jump-amount">${formatCurrency(portfolio.totals.totalAssets)}</strong>
-          <span class="account-jump-meta ${getToneClass(portfolio.totals.profitLoss)}">
-            ${formatSignedCurrency(portfolio.totals.profitLoss)} / ${formatSignedPercent(portfolio.totals.totalReturn)}
-          </span>
-        </a>
-      `,
-    )
+    .map((portfolio) => {
+      const topHoldings = getTopHoldings(portfolio);
+
+      return `
+        <article class="overview-card">
+          <div class="overview-card-head">
+            <div>
+              <p class="overview-card-label">${portfolio.name}</p>
+              <h3 class="overview-card-total">${formatCurrency(portfolio.totals.totalAssets)}</h3>
+            </div>
+            <a class="overview-card-link" href="#${portfolio.id}">상세 보기</a>
+          </div>
+
+          <div class="overview-metric-grid">
+            <div class="overview-metric">
+              <span>평가손익</span>
+              <strong class="${getToneClass(portfolio.totals.profitLoss)}">${formatSignedCurrency(portfolio.totals.profitLoss)}</strong>
+            </div>
+            <div class="overview-metric">
+              <span>수익률</span>
+              <strong class="${getToneClass(portfolio.totals.totalReturn)}">${formatSignedPercent(portfolio.totals.totalReturn)}</strong>
+            </div>
+            <div class="overview-metric">
+              <span>현금</span>
+              <strong>${formatCurrency(portfolio.cash)}</strong>
+            </div>
+            <div class="overview-metric">
+              <span>보유 종목</span>
+              <strong>${currencyFormatter.format(portfolio.holdings.length)}개</strong>
+            </div>
+          </div>
+
+          <div class="overview-top-list">
+            ${topHoldings
+              .map(
+                (holding) => `
+                  <div class="overview-top-item">
+                    <span class="overview-top-name">${holding.name}</span>
+                    <span class="overview-top-meta">${formatPercent(holding.assetWeight)} · ${formatCurrency(holding.marketValue)}</span>
+                  </div>
+                `,
+              )
+              .join("")}
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderAccountComparisonRows(book) {
+  return book.portfolios
+    .map((portfolio) => {
+      const primaryHolding = getTopHoldings(portfolio, 1)[0];
+
+      return `
+        <tr>
+          <td>
+            <a class="comparison-account" href="#${portfolio.id}">
+              <strong>${portfolio.name}</strong>
+              <span>${portfolio.snapshotLabel}</span>
+            </a>
+          </td>
+          <td>${formatCurrency(portfolio.totals.totalAssets)}</td>
+          <td class="${getToneClass(portfolio.totals.profitLoss)}">${formatSignedCurrency(portfolio.totals.profitLoss)}</td>
+          <td class="${getToneClass(portfolio.totals.totalReturn)}">${formatSignedPercent(portfolio.totals.totalReturn)}</td>
+          <td>${formatCurrency(portfolio.cash)}</td>
+          <td>${formatPercent(portfolio.totals.investedWeight)}</td>
+          <td>
+            ${primaryHolding
+              ? `
+                <div class="comparison-primary">
+                  <strong>${primaryHolding.name}</strong>
+                  <span>총자산 ${formatPercent(primaryHolding.assetWeight)}</span>
+                </div>
+              `
+              : "-"}
+          </td>
+        </tr>
+      `;
+    })
     .join("");
 }
 
@@ -367,17 +443,19 @@ function renderTableRows(portfolio) {
     .join("");
 }
 
-function renderNotes(portfolio) {
-  const notes = [
-    `<strong>현금</strong> ${formatCurrency(portfolio.cash)}은 별도 보유 자산으로 요약 카드에 반영했습니다.`,
-    `<strong>보유 종목 손익 합계</strong>는 ${formatSignedCurrency(portfolio.totals.profitLoss)}입니다.`,
-    `<strong>현재가 자동 갱신</strong>이 들어오면 평가금액, 손익, 수익률이 함께 재계산됩니다.`,
-    ...portfolio.notes.map(
-      (note) => `<strong>${note.label}</strong> ${note.text}`,
-    ),
-  ];
-
-  return notes.map((note) => `<li>${note}</li>`).join("");
+function renderFocusCards(portfolio) {
+  return getTopHoldings(portfolio)
+    .map(
+      (holding, index) => `
+        <article class="focus-card">
+          <p class="focus-label">상위 보유 ${index + 1}</p>
+          <h3 class="focus-name">${holding.name}</h3>
+          <p class="focus-meta">${formatCurrency(holding.marketValue)} · 총자산 ${formatPercent(holding.assetWeight)}</p>
+          <p class="focus-change ${getToneClass(holding.profitLoss)}">${formatSignedCurrency(holding.profitLoss)} / ${formatSignedPercent(holding.profitRate)}</p>
+        </article>
+      `,
+    )
+    .join("");
 }
 
 function renderPortfolioSection(portfolio) {
@@ -389,14 +467,17 @@ function renderPortfolioSection(portfolio) {
           <div>
             <h2 class="hero-title">${portfolio.name}</h2>
             <p class="hero-copy">
-              ${portfolio.snapshotLabel} 원장 데이터를 기준으로 수량과 매입금액을 유지하고,
-              현재가는 외부 시세 파일이 있으면 자동으로 반영합니다.
+              ${portfolio.snapshotLabel} 기준 원장 데이터를 유지하고, 현재가만 외부 시세 파일로 다시 읽어
+              평가금액과 손익을 재계산합니다.
             </p>
           </div>
           <div class="account-pill">총자산 ${formatCurrency(portfolio.totals.totalAssets)}</div>
         </div>
         <div class="summary-grid">
           ${renderSummaryCards(portfolio)}
+        </div>
+        <div class="focus-strip">
+          ${renderFocusCards(portfolio)}
         </div>
       </section>
 
@@ -444,13 +525,6 @@ function renderPortfolioSection(portfolio) {
             </tfoot>
           </table>
         </div>
-      </section>
-
-      <section class="notes-card">
-        <h3 class="notes-title">메모</h3>
-        <ul class="notes-list">
-          ${renderNotes(portfolio)}
-        </ul>
       </section>
     </section>
   `;
@@ -501,13 +575,13 @@ function renderApp(book) {
   app.innerHTML = `
     <section class="dashboard">
       <section class="hero">
-        <div class="eyebrow">Pension Saving Portfolio</div>
+        <div class="eyebrow">Tax-Sheltered Accounts</div>
         <div class="hero-head">
           <div>
-            <h1 class="hero-title">연금저축 포트폴리오</h1>
+            <h1 class="hero-title">절세계좌 포트폴리오</h1>
             <p class="hero-copy">
-              원장 데이터는 고정하고, 현재가만 외부 시세 파일에서 주기적으로 다시 읽도록 바꿨습니다.
-              자동 갱신 파일이 없으면 마지막 스냅샷 가격으로 그대로 계산합니다.
+              연금저축, 퇴직연금, ISA를 같은 기준으로 묶어 총자산, 손익, 현금, 핵심 보유 종목을 한 화면에서 점검할 수 있게 구성했습니다.
+              현재가 자동 갱신이 없으면 마지막 스냅샷 가격으로 그대로 계산합니다.
             </p>
           </div>
           <div class="account-pill">기준 통화 ${book.meta.currency}</div>
@@ -529,12 +603,67 @@ function renderApp(book) {
         <div class="summary-grid">
           ${renderBookSummaryCards(book)}
         </div>
-        <div class="account-jump-list">
-          ${renderAccountJumpLinks(book)}
+      </section>
+
+      <section class="overview-section">
+        <div class="section-head overview-section-head">
+          <div>
+            <h2 class="section-title">계좌 한눈에 보기</h2>
+            <p class="section-copy">
+              각 계좌의 총자산, 손익, 현금, 핵심 보유 종목을 먼저 비교하고 필요한 계좌만 아래 상세 표로 내려가면 됩니다.
+            </p>
+          </div>
+        </div>
+
+        <div class="overview-layout">
+          <div class="overview-grid">
+            ${renderAccountOverviewCards(book)}
+          </div>
+
+          <section class="comparison-card">
+            <div class="section-head comparison-head">
+              <div>
+                <h3 class="section-title">계좌 비교표</h3>
+                <p class="section-copy">총자산, 평가손익, 수익률, 투자 비중을 같은 행으로 비교합니다.</p>
+              </div>
+            </div>
+
+            <div class="comparison-table-wrap">
+              <table class="comparison-table">
+                <thead>
+                  <tr>
+                    <th>계좌</th>
+                    <th>총자산</th>
+                    <th>평가손익</th>
+                    <th>수익률</th>
+                    <th>현금</th>
+                    <th>주식 비중</th>
+                    <th>상위 보유</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${renderAccountComparisonRows(book)}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
       </section>
 
-      ${book.portfolios.map(renderPortfolioSection).join("")}
+      <section class="detail-section">
+        <div class="section-head detail-head">
+          <div>
+            <h2 class="section-title">계좌 상세</h2>
+            <p class="section-copy">
+              각 계좌의 원장 기준 수량과 평단, 그리고 최신 현재가 기준 평가금액과 손익을 상세 표로 확인합니다.
+            </p>
+          </div>
+        </div>
+
+        <div class="account-stack-list">
+          ${book.portfolios.map(renderPortfolioSection).join("")}
+        </div>
+      </section>
     </section>
   `;
 }
