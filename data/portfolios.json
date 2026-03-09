@@ -18,7 +18,7 @@
           "snapshotPrice": 22495
         },
         {
-          "ticker": "446720",
+          "ticker": "493420",
           "name": "SOL 미국배당다우존스2호",
           "type": "ETF",
           "quantity": 580,
@@ -73,6 +73,28 @@
         {
           "label": "KODEX 미국성장커버드콜액티브",
           "text": "명칭은 스크린샷에서 축약된 텍스트를 바탕으로 보완한 값이며, 정확한 종목코드는 확인 전까지 수동 가격으로 유지합니다."
+        }
+      ]
+    },
+    {
+      "id": "pension-savings-ingyeong",
+      "name": "연금저축(인경)",
+      "snapshotLabel": "2026년 3월 9일 사용자 제공 수치 기준",
+      "cash": 0,
+      "holdings": [
+        {
+          "ticker": "446720",
+          "name": "SOL 미국배당다우존스",
+          "type": "ETF",
+          "quantity": 526,
+          "costBasis": 6237720,
+          "snapshotPrice": 13300
+        }
+      ],
+      "notes": [
+        {
+          "label": "현금/예수금",
+          "text": "현금 정보는 전달되지 않아 우선 0원으로 처리했습니다."
         }
       ]
     },
