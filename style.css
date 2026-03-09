@@ -8,7 +8,7 @@
   --muted: #98a4c3;
   --accent: #62a8ff;
   --accent-strong: #2f82ff;
-  --positive: #57d49a;
+  --positive: #ff6f91;
   --negative: #57a6ff;
   --warning: #ffd166;
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
@@ -61,6 +61,41 @@ body::before {
   gap: 24px;
 }
 
+.state-card {
+  padding: 40px 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, rgba(12, 17, 34, 0.96), rgba(7, 11, 22, 0.92));
+  box-shadow: var(--shadow);
+}
+
+.state-eyebrow {
+  margin: 0 0 12px;
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.state-title {
+  margin: 0;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  letter-spacing: -0.04em;
+}
+
+.state-copy {
+  margin: 12px 0 0;
+  max-width: 680px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.account-stack {
+  display: grid;
+  gap: 24px;
+}
+
 .hero,
 .table-card,
 .notes-card {
@@ -93,6 +128,14 @@ body::before {
   justify-content: space-between;
   gap: 20px;
   align-items: flex-start;
+}
+
+.hero-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  margin-top: 22px;
 }
 
 .eyebrow {
@@ -139,11 +182,128 @@ body::before {
   white-space: nowrap;
 }
 
+.market-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(140, 168, 255, 0.18);
+  background: rgba(15, 23, 44, 0.88);
+}
+
+.market-status strong,
+.market-status span {
+  display: block;
+}
+
+.market-status strong {
+  font-size: 0.94rem;
+}
+
+.market-status span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 6px rgba(98, 168, 255, 0.12);
+}
+
+.status-live .status-dot {
+  background: var(--positive);
+  box-shadow: 0 0 0 6px rgba(255, 111, 145, 0.14);
+}
+
+.status-fallback .status-dot {
+  background: var(--warning);
+  box-shadow: 0 0 0 6px rgba(255, 209, 102, 0.14);
+}
+
+.status-stale .status-dot {
+  background: var(--negative);
+  box-shadow: 0 0 0 6px rgba(87, 166, 255, 0.14);
+}
+
+.status-loading .status-dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 6px rgba(98, 168, 255, 0.14);
+}
+
+.ghost-button {
+  padding: 14px 18px;
+  border: 1px solid rgba(98, 168, 255, 0.26);
+  border-radius: 999px;
+  background: rgba(15, 23, 44, 0.6);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.ghost-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(98, 168, 255, 0.46);
+  background: rgba(18, 28, 52, 0.92);
+}
+
+.ghost-button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-top: 28px;
+}
+
+.account-jump-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.account-jump {
+  min-width: 220px;
+  flex: 1 1 240px;
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  border: 1px solid rgba(140, 168, 255, 0.18);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(16, 24, 45, 0.96), rgba(11, 16, 29, 0.92));
+  color: var(--text);
+  text-decoration: none;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.account-jump:hover {
+  transform: translateY(-2px);
+  border-color: rgba(98, 168, 255, 0.42);
+  background: linear-gradient(180deg, rgba(19, 31, 58, 0.98), rgba(12, 18, 34, 0.94));
+}
+
+.account-jump-name {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.account-jump-amount {
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+
+.account-jump-meta {
+  font-size: 0.9rem;
 }
 
 .summary-card {
@@ -287,6 +447,11 @@ tfoot td {
   color: var(--warning);
 }
 
+.tag-live {
+  background: rgba(255, 111, 145, 0.12);
+  color: var(--positive);
+}
+
 .metric {
   display: inline-flex;
   flex-direction: column;
@@ -336,7 +501,8 @@ tfoot td {
   }
 
   .hero,
-  .notes-card {
+  .notes-card,
+  .state-card {
     padding: 22px;
   }
 
@@ -347,6 +513,11 @@ tfoot td {
   .hero-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .hero-toolbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .summary-grid {

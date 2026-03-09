@@ -1,0 +1,40 @@
+name: Update Live Prices
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 0-6 * * 1-5"
+
+permissions:
+  contents: write
+
+jobs:
+  update-live-prices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Refresh live price file
+        run: node scripts/update-live-prices.mjs
+        env:
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_BASE_URL: ${{ secrets.KIS_BASE_URL }}
+
+      - name: Commit updated data
+        run: |
+          if git diff --quiet -- data/live-prices.json; then
+            echo "No live price changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/live-prices.json
+          git commit -m "Update live prices"
+          git push

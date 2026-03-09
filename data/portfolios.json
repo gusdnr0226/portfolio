@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "currency": "KRW"
+  },
+  "accounts": [
+    {
+      "id": "pension-savings-1",
+      "name": "연금저축1",
+      "snapshotLabel": "2026년 3월 9일 20:38 스크린샷 기준",
+      "cash": 16157,
+      "holdings": [
+        {
+          "ticker": "379800",
+          "name": "KODEX 미국S&P500",
+          "type": "ETF",
+          "quantity": 321,
+          "costBasis": 6088520,
+          "snapshotPrice": 22495
+        },
+        {
+          "ticker": "446720",
+          "name": "SOL 미국배당다우존스2호",
+          "type": "ETF",
+          "quantity": 580,
+          "costBasis": 6163390,
+          "snapshotPrice": 12390
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "pension-savings-2",
+      "name": "연금저축2",
+      "snapshotLabel": "2026년 3월 9일 20:22 스크린샷 기준",
+      "cash": 94647,
+      "holdings": [
+        {
+          "ticker": "379800",
+          "name": "KODEX 미국S&P500",
+          "type": "ETF",
+          "quantity": 938,
+          "costBasis": 21334610,
+          "snapshotPrice": 22495
+        },
+        {
+          "ticker": "441640",
+          "name": "KODEX 미국성장커버드콜액티브",
+          "type": "ETF",
+          "quantity": 1000,
+          "costBasis": 9927070,
+          "snapshotPrice": 9320,
+          "nameInferred": true
+        },
+        {
+          "ticker": "379810",
+          "name": "KODEX 미국나스닥100",
+          "type": "ETF",
+          "quantity": 259,
+          "costBasis": 6429270,
+          "snapshotPrice": 24080
+        },
+        {
+          "ticker": "088980",
+          "name": "맥쿼리인프라",
+          "type": "인프라",
+          "quantity": 138,
+          "costBasis": 1562420,
+          "snapshotPrice": 11240
+        }
+      ],
+      "notes": [
+        {
+          "label": "KODEX 미국성장커버드콜액티브",
+          "text": "명칭은 스크린샷에서 축약된 텍스트를 바탕으로 보완한 값입니다."
+        }
+      ]
+    }
+  ]
+}
