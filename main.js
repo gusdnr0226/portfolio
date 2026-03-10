@@ -9,9 +9,19 @@ const YAHOO_SPARK_BATCH_SIZE = 20;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 const currencyFormatter = new Intl.NumberFormat("ko-KR");
+const quantityFormatter = new Intl.NumberFormat("ko-KR", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 6,
+});
 const decimalFormatter = new Intl.NumberFormat("ko-KR", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 1,
+});
+const usdCurrencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 });
 const percentFormatter = new Intl.NumberFormat("ko-KR", {
   minimumFractionDigits: 2,
@@ -43,14 +53,48 @@ function formatSignedCurrency(value) {
   return `${prefix}${currencyFormatter.format(rounded)}원`;
 }
 
-function formatPrice(value) {
-  return `${currencyFormatter.format(Math.round(value))}원`;
+function getHoldingCurrency(holding) {
+  if (holding?.currency) {
+    return holding.currency;
+  }
+
+  return /^[0-9]/.test(holding?.ticker ?? "") ? "KRW" : "USD";
 }
 
-function formatAverageCost(value) {
+function formatMoney(value, currency = "KRW") {
+  if (currency === "USD") {
+    return usdCurrencyFormatter.format(value);
+  }
+
+  return formatCurrency(value);
+}
+
+function formatSignedMoney(value, currency = "KRW") {
+  if (currency === "USD") {
+    const prefix = value > 0 ? "+" : value < 0 ? "-" : "";
+    return `${prefix}${usdCurrencyFormatter.format(Math.abs(value))}`;
+  }
+
+  return formatSignedCurrency(value);
+}
+
+function formatPrice(value, currency = "KRW") {
+  return formatMoney(value, currency);
+}
+
+function formatAverageCost(value, currency = "KRW") {
+  if (currency === "USD") {
+    return usdCurrencyFormatter.format(value);
+  }
+
   const isWhole = Math.abs(value - Math.round(value)) < 0.05;
   const displayValue = isWhole ? Math.round(value) : Number(value.toFixed(1));
   return `${decimalFormatter.format(displayValue)}원`;
+}
+
+function formatQuantity(value) {
+  const roundedValue = Number(value.toFixed(6));
+  return `${quantityFormatter.format(roundedValue)}주`;
 }
 
 function formatPercent(value) {
@@ -209,19 +253,34 @@ function getExternalQuoteTickers(portfolioSource) {
     return [];
   }
 
-  return [
-    ...new Set(
-      portfolioSource.accounts.flatMap((account) =>
-        account.holdings
-          .filter((holding) => !holding.manualPriceOnly)
-          .map((holding) => holding.ticker),
-      ),
-    ),
-  ];
+  const tickers = new Set();
+  let needsUsdKrwRate = false;
+
+  portfolioSource.accounts.forEach((account) => {
+    account.holdings.forEach((holding) => {
+      if (!holding.manualPriceOnly) {
+        tickers.add(holding.ticker);
+      }
+
+      if (getHoldingCurrency(holding) === "USD") {
+        needsUsdKrwRate = true;
+      }
+    });
+  });
+
+  if (needsUsdKrwRate) {
+    tickers.add("KRW=X");
+  }
+
+  return [...tickers];
 }
 
 function toYahooSymbol(ticker) {
-  return `${ticker}.KS`;
+  if (ticker === "KRW=X") {
+    return ticker;
+  }
+
+  return /^[0-9]/.test(ticker) ? `${ticker}.KS` : ticker;
 }
 
 function toTickerFromYahooSymbol(symbol) {
@@ -419,12 +478,32 @@ function renderCurrentBook() {
   renderApp(buildBookData(state.portfolioSource, state.livePriceSource));
 }
 
+function getUsdKrwRate(source, quotes) {
+  const liveRate = quotes["KRW=X"]?.price;
+
+  if (Number.isFinite(liveRate)) {
+    return liveRate;
+  }
+
+  if (Number.isFinite(source?.snapshotUsdKrw)) {
+    return source.snapshotUsdKrw;
+  }
+
+  return 1;
+}
+
+function convertToBaseCurrency(value, currency, usdKrwRate) {
+  return currency === "USD" ? value * usdKrwRate : value;
+}
+
 function buildPortfolioData(source, livePriceSource) {
   const quotes = livePriceSource?.quotes ?? {};
   const isFallbackSource = livePriceSource?.provider === "snapshot-fallback";
   const hasAutomaticQuotes = isAutomaticLivePriceSource(livePriceSource);
+  const usdKrwRate = getUsdKrwRate(source, quotes);
 
   const enrichedHoldings = source.holdings.map((holding) => {
+    const currency = getHoldingCurrency(holding);
     const storedQuote = !holding.manualPriceOnly ? quotes[holding.ticker] : null;
     const shouldUseStoredQuote =
       hasUsableQuote(storedQuote) &&
@@ -432,13 +511,21 @@ function buildPortfolioData(source, livePriceSource) {
     const currentPrice = shouldUseStoredQuote ? storedQuote.price : holding.snapshotPrice;
     const marketValue = currentPrice * holding.quantity;
     const profitLoss = marketValue - holding.costBasis;
+    const marketValueBase = convertToBaseCurrency(marketValue, currency, usdKrwRate);
+    const costBasisBase = convertToBaseCurrency(holding.costBasis, currency, usdKrwRate);
+    const profitLossBase = marketValueBase - costBasisBase;
     const profitRate = holding.costBasis === 0 ? 0 : profitLoss / holding.costBasis;
 
     return {
       ...holding,
+      currency,
+      usdKrwRate,
       currentPrice,
       marketValue,
+      marketValueBase,
+      costBasisBase,
       profitLoss,
+      profitLossBase,
       profitRate,
       averageCost: holding.costBasis / holding.quantity,
       priceSource: holding.manualPriceOnly
@@ -454,9 +541,9 @@ function buildPortfolioData(source, livePriceSource) {
   const totals = enrichedHoldings.reduce(
     (accumulator, holding) => {
       accumulator.quantity += holding.quantity;
-      accumulator.marketValue += holding.marketValue;
-      accumulator.costBasis += holding.costBasis;
-      accumulator.profitLoss += holding.profitLoss;
+      accumulator.marketValue += holding.marketValueBase;
+      accumulator.costBasis += holding.costBasisBase;
+      accumulator.profitLoss += holding.profitLossBase;
       return accumulator;
     },
     {
@@ -474,12 +561,15 @@ function buildPortfolioData(source, livePriceSource) {
 
   const holdingsWithWeight = enrichedHoldings.map((holding) => ({
     ...holding,
-    assetWeight: totalAssets === 0 ? 0 : holding.marketValue / totalAssets,
+    assetWeight: totalAssets === 0 ? 0 : holding.marketValueBase / totalAssets,
   }));
+  const holdingCurrencies = [...new Set(holdingsWithWeight.map((holding) => holding.currency))];
 
   return {
     ...source,
     holdings: holdingsWithWeight,
+    hasForeignCurrency: holdingCurrencies.some((currency) => currency !== "KRW"),
+    usdKrwRate,
     totals: {
       ...totals,
       totalAssets,
@@ -521,6 +611,7 @@ function buildBookData(source, livePriceSource) {
   return {
     meta: source.meta,
     livePriceSource,
+    hasForeignCurrency: portfolios.some((portfolio) => portfolio.hasForeignCurrency),
     portfolios,
     overview,
   };
@@ -662,7 +753,9 @@ function renderBookSummaryCards(book) {
     {
       label: "총 보유 종목",
       value: `${currencyFormatter.format(book.overview.holdingsCount)}개`,
-      detail: "현재가만 외부 시세로 갱신, 수량/평단은 원장 기준",
+      detail: book.hasForeignCurrency
+        ? "현재가와 환율만 자동 갱신, 수량/평단은 원장 기준"
+        : "현재가만 외부 시세로 갱신, 수량/평단은 원장 기준",
       tone: "",
     },
   ];
@@ -682,7 +775,7 @@ function renderBookSummaryCards(book) {
 
 function getTopHoldings(portfolio, limit = 3) {
   return [...portfolio.holdings]
-    .sort((left, right) => right.marketValue - left.marketValue)
+    .sort((left, right) => right.marketValueBase - left.marketValueBase)
     .slice(0, limit);
 }
 
@@ -766,23 +859,24 @@ function renderTableRows(portfolio) {
             <div class="asset-name">${holding.name}</div>
             <div class="asset-meta">
               <span class="tag">${holding.type}</span>
+              ${holding.currency !== "KRW" ? `<span class="tag">${holding.currency}</span>` : ""}
               <span class="tag ${holding.priceSource === "snapshot" || holding.priceSource === "manual" ? "tag-warning" : "tag-live"}">
                 ${getPriceSourceLabel(holding.priceSource)}
               </span>
               ${holding.nameInferred ? '<span class="tag tag-warning">이름 추정</span>' : ""}
             </div>
           </td>
-          <td>${currencyFormatter.format(holding.quantity)}주</td>
+          <td>${formatQuantity(holding.quantity)}</td>
           <td>
             <div class="metric">
-              <strong>${formatPrice(holding.currentPrice)}</strong>
+              <strong>${formatPrice(holding.currentPrice, holding.currency)}</strong>
               <span>${getPriceSourceDetail(holding.priceSource)}</span>
             </div>
           </td>
-          <td>${formatAverageCost(holding.averageCost)}</td>
-          <td>${formatCurrency(holding.costBasis)}</td>
-          <td>${formatCurrency(holding.marketValue)}</td>
-          <td class="${getToneClass(holding.profitLoss)}">${formatSignedCurrency(holding.profitLoss)}</td>
+          <td>${formatAverageCost(holding.averageCost, holding.currency)}</td>
+          <td>${formatMoney(holding.costBasis, holding.currency)}</td>
+          <td>${formatMoney(holding.marketValue, holding.currency)}</td>
+          <td class="${getToneClass(holding.profitLoss)}">${formatSignedMoney(holding.profitLoss, holding.currency)}</td>
           <td class="${getToneClass(holding.profitRate)}">${formatSignedPercent(holding.profitRate)}</td>
           <td>${formatPercent(holding.assetWeight)}</td>
         </tr>
@@ -792,6 +886,13 @@ function renderTableRows(portfolio) {
 }
 
 function renderPortfolioSection(portfolio) {
+  const heroCopy = portfolio.hasForeignCurrency
+    ? `${portfolio.snapshotLabel} 기준 원장 데이터를 유지하고, 현재가와 환율만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어 계산합니다. 달러 종목은 USD 기준으로 표기하고 계좌 합계와 비중은 KRW 환산으로 계산합니다.`
+    : `${portfolio.snapshotLabel} 기준 원장 데이터를 유지하고, 현재가만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어 평가금액과 손익을 재계산합니다.`;
+  const tableCopy = portfolio.hasForeignCurrency
+    ? "수량과 매입금액은 고정 원장 데이터입니다. 해외 종목 금액은 USD 기준으로 표기하고, 계좌 합계와 비중은 KRW 환산 기준으로 계산합니다."
+    : "수량과 매입금액은 고정 원장 데이터입니다. 현재가, 평가금액, 손익, 수익률은 최신 시세 기준으로 다시 계산됩니다.";
+
   return `
     <section class="account-stack" id="${portfolio.id}">
       <section class="hero">
@@ -799,10 +900,7 @@ function renderPortfolioSection(portfolio) {
         <div class="hero-head">
           <div>
             <h2 class="hero-title">${portfolio.name}</h2>
-            <p class="hero-copy">
-              ${portfolio.snapshotLabel} 기준 원장 데이터를 유지하고, 현재가만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어
-              평가금액과 손익을 재계산합니다.
-            </p>
+            <p class="hero-copy">${heroCopy}</p>
           </div>
           <div class="account-pill">총자산 ${formatCurrency(portfolio.totals.totalAssets)}</div>
         </div>
@@ -815,9 +913,7 @@ function renderPortfolioSection(portfolio) {
         <div class="section-head">
           <div>
             <h3 class="section-title">보유 종목 표</h3>
-            <p class="section-copy">
-              수량과 매입금액은 고정 원장 데이터입니다. 현재가, 평가금액, 손익, 수익률은 최신 시세 기준으로 다시 계산됩니다.
-            </p>
+            <p class="section-copy">${tableCopy}</p>
           </div>
           <div class="section-pill">총 ${portfolio.holdings.length}종목</div>
         </div>
@@ -843,7 +939,7 @@ function renderPortfolioSection(portfolio) {
             <tfoot>
               <tr>
                 <td>합계 (주식)</td>
-                <td>${currencyFormatter.format(portfolio.totals.quantity)}주</td>
+                <td>${formatQuantity(portfolio.totals.quantity)}</td>
                 <td>-</td>
                 <td>-</td>
                 <td>${formatCurrency(portfolio.totals.costBasis)}</td>
@@ -905,12 +1001,13 @@ function renderApp(book) {
   app.innerHTML = `
     <section class="dashboard">
       <section class="hero">
-        <div class="eyebrow">Tax-Sheltered Accounts</div>
+        <div class="eyebrow">All Accounts</div>
         <div class="hero-head">
           <div>
-            <h1 class="hero-title">절세계좌 포트폴리오</h1>
+            <h1 class="hero-title">전체 포트폴리오</h1>
             <p class="hero-copy">
-              연금저축, 퇴직연금, ISA를 같은 기준으로 묶어 총자산, 손익, 현금, 계좌별 보유 현황을 한 화면에서 점검할 수 있게 구성했습니다.
+              절세계좌와 직투계좌를 같은 기준으로 묶어 총자산, 손익, 현금, 계좌별 보유 현황을 한 화면에서 점검할 수 있게 구성했습니다.
+              미국 종목은 USD 기준으로 표기하고, 계좌와 전체 합계는 KRW 환산 기준으로 계산합니다.
               브라우저에서 외부 시세를 직접 확인하고, 응답이 없으면 저장된 최신 가격 파일을 폴백으로 사용합니다.
             </p>
           </div>

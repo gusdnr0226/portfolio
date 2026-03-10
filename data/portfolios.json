@@ -322,6 +322,121 @@
           "snapshotPrice": 22800
         }
       ]
+    },
+    {
+      "id": "direct-investment",
+      "name": "직투계좌",
+      "snapshotLabel": "2026년 3월 10일 21:32 스크린샷 기준",
+      "cash": 0,
+      "snapshotUsdKrw": 1472.18,
+      "holdings": [
+        {
+          "ticker": "SCHD",
+          "name": "SCHD",
+          "type": "ETF",
+          "currency": "USD",
+          "quantity": 1239.778469,
+          "costBasis": 33502.33,
+          "snapshotPrice": 30.87
+        },
+        {
+          "ticker": "QQQ",
+          "name": "QQQ",
+          "type": "ETF",
+          "currency": "USD",
+          "quantity": 48.99814,
+          "costBasis": 25721.57,
+          "snapshotPrice": 605.87
+        },
+        {
+          "ticker": "JEPQ",
+          "name": "JEPQ",
+          "type": "ETF",
+          "currency": "USD",
+          "quantity": 459.260168,
+          "costBasis": 25814.46,
+          "snapshotPrice": 57.4
+        },
+        {
+          "ticker": "JEPI",
+          "name": "JEPI",
+          "type": "ETF",
+          "currency": "USD",
+          "quantity": 428.242203,
+          "costBasis": 24220.84,
+          "snapshotPrice": 58.36
+        },
+        {
+          "ticker": "VOO",
+          "name": "VOO",
+          "type": "ETF",
+          "currency": "USD",
+          "quantity": 36.550708,
+          "costBasis": 20301.62,
+          "snapshotPrice": 621.39
+        },
+        {
+          "ticker": "O",
+          "name": "리얼티 인컴",
+          "type": "리츠",
+          "currency": "USD",
+          "quantity": 249.590012,
+          "costBasis": 14072.53,
+          "snapshotPrice": 64.83
+        },
+        {
+          "ticker": "IEF",
+          "name": "IEF",
+          "type": "채권 ETF",
+          "currency": "USD",
+          "quantity": 114,
+          "costBasis": 11019.81,
+          "snapshotPrice": 96.58
+        },
+        {
+          "ticker": "AGNC",
+          "name": "AGNC 인베스트먼트",
+          "type": "리츠",
+          "currency": "USD",
+          "quantity": 800,
+          "costBasis": 8425.8,
+          "snapshotPrice": 10.55
+        },
+        {
+          "ticker": "TLT",
+          "name": "TLT",
+          "type": "채권 ETF",
+          "currency": "USD",
+          "quantity": 86,
+          "costBasis": 7687.29,
+          "snapshotPrice": 88.61
+        },
+        {
+          "ticker": "ULTY",
+          "name": "ULTY",
+          "type": "ETF",
+          "currency": "USD",
+          "quantity": 50,
+          "costBasis": 1982.62,
+          "snapshotPrice": 33.15
+        },
+        {
+          "ticker": "498400",
+          "name": "KODEX 200타겟위클리커버드콜",
+          "type": "ETF",
+          "quantity": 500,
+          "costBasis": 7271000,
+          "snapshotPrice": 17500
+        },
+        {
+          "ticker": "488770",
+          "name": "KODEX 머니마켓액티브",
+          "type": "ETF",
+          "quantity": 60,
+          "costBasis": 6211410,
+          "snapshotPrice": 103765
+        }
+      ]
     }
   ]
 }
