@@ -138,6 +138,13 @@ body::before {
   margin-top: 22px;
 }
 
+.toolbar-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .eyebrow {
   display: inline-flex;
   align-items: center;
@@ -256,6 +263,11 @@ body::before {
 .ghost-button:disabled {
   opacity: 0.65;
   cursor: wait;
+}
+
+.ghost-button-muted {
+  border-color: rgba(140, 168, 255, 0.18);
+  background: rgba(12, 19, 36, 0.82);
 }
 
 .summary-grid {
@@ -729,6 +741,15 @@ tfoot td {
   .hero-toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .toolbar-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .toolbar-actions .ghost-button {
+    flex: 1 1 0;
   }
 
   .overview-layout {
