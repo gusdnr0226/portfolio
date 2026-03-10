@@ -42,14 +42,12 @@
           "snapshotPrice": 22495
         },
         {
-          "ticker": "MANUAL-KODEX-INFERRED-01",
+          "ticker": "0144L0",
           "name": "KODEX 미국성장커버드콜액티브",
           "type": "ETF",
           "quantity": 1000,
           "costBasis": 9927070,
-          "snapshotPrice": 9320,
-          "manualPriceOnly": true,
-          "nameInferred": true
+          "snapshotPrice": 9320
         },
         {
           "ticker": "379810",
