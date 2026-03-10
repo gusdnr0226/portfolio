@@ -98,7 +98,8 @@ body::before {
 
 .hero,
 .table-card,
-.overview-section {
+.overview-section,
+.treemap-card {
   position: relative;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -109,7 +110,8 @@ body::before {
 
 .hero::after,
 .table-card::after,
-.overview-section::after {
+.overview-section::after,
+.treemap-card::after {
   content: "";
   position: absolute;
   inset: auto auto -80px -40px;
@@ -458,6 +460,231 @@ body::before {
   font-size: 0.78rem;
 }
 
+.treemap-card {
+  margin: 0 16px 24px;
+}
+
+.treemap-wrap {
+  padding: 0 18px 18px;
+}
+
+.treemap-canvas {
+  position: relative;
+  min-height: 620px;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: calc(var(--radius-xl) - 8px);
+  border: 1px solid rgba(140, 168, 255, 0.12);
+  background:
+    radial-gradient(circle at top left, rgba(98, 168, 255, 0.12), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(255, 111, 145, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(8, 12, 24, 0.96), rgba(5, 8, 16, 0.94));
+}
+
+.treemap-super,
+.treemap-category,
+.treemap-tile {
+  position: absolute;
+}
+
+.treemap-super {
+  border-radius: 22px;
+  border: 1px solid var(--treemap-outline);
+  background: linear-gradient(180deg, var(--treemap-accent-strong), rgba(7, 11, 22, 0.84));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+}
+
+.treemap-super-head {
+  position: absolute;
+  inset: 12px 12px auto 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  z-index: 2;
+}
+
+.treemap-super-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.treemap-super-value {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.15rem;
+  letter-spacing: -0.03em;
+}
+
+.treemap-super-share {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(6, 10, 20, 0.42);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.treemap-super-body {
+  position: absolute;
+  inset: 58px 12px 12px;
+}
+
+.treemap-category {
+  border-radius: 18px;
+  border: 1px solid var(--treemap-outline);
+  background: linear-gradient(180deg, var(--treemap-accent-soft), rgba(9, 13, 24, 0.9));
+  backdrop-filter: blur(10px);
+}
+
+.treemap-category-head {
+  position: absolute;
+  inset: 10px 10px auto 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  z-index: 2;
+}
+
+.treemap-category-head strong {
+  min-width: 0;
+  font-size: 0.86rem;
+  letter-spacing: -0.02em;
+}
+
+.treemap-category-head span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.treemap-category-body {
+  position: absolute;
+  inset: 38px 8px 8px;
+}
+
+.treemap-tile {
+  padding: 3px;
+}
+
+.treemap-tile-inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid var(--treemap-outline);
+  background:
+    linear-gradient(180deg, var(--treemap-accent-soft), rgba(10, 15, 31, 0.92)),
+    linear-gradient(180deg, rgba(16, 24, 45, 0.96), rgba(11, 16, 29, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.treemap-tile-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.treemap-tile-name {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.94rem;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.treemap-tile-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(6, 10, 20, 0.42);
+  color: var(--text);
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.treemap-tile-body {
+  display: grid;
+  gap: 4px;
+}
+
+.treemap-tile-value {
+  font-size: 0.88rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.treemap-tile-meta {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.tile-xl .treemap-tile-name,
+.tile-lg .treemap-tile-name {
+  font-size: 1rem;
+}
+
+.tile-sm .treemap-category-head span,
+.tile-sm .treemap-tile-meta:last-child,
+.tile-xs .treemap-category-head span,
+.tile-xs .treemap-tile-meta:last-child {
+  display: none;
+}
+
+.tile-xs .treemap-tile-badge,
+.tile-xs .treemap-tile-meta {
+  display: none;
+}
+
+.tile-xs .treemap-tile-inner {
+  padding: 8px;
+  gap: 6px;
+}
+
+.tile-xs .treemap-tile-name {
+  font-size: 0.78rem;
+  -webkit-line-clamp: 3;
+}
+
+.tile-xs .treemap-tile-value {
+  font-size: 0.74rem;
+}
+
+.treemap-footnote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+
+.treemap-footnote span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(13, 20, 39, 0.88);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .detail-section {
   display: grid;
   gap: 20px;
@@ -725,7 +952,8 @@ tfoot td {
 
   .hero,
   .state-card,
-  .overview-section {
+  .overview-section,
+  .treemap-card {
     padding: 22px;
   }
 
@@ -755,6 +983,24 @@ tfoot td {
   .overview-layout {
     grid-template-columns: 1fr;
     padding: 0;
+  }
+
+  .treemap-card {
+    margin: 0 0 24px;
+    padding: 0;
+  }
+
+  .treemap-wrap {
+    padding: 0 0 16px;
+  }
+
+  .treemap-canvas {
+    min-height: 760px;
+    aspect-ratio: auto;
+  }
+
+  .treemap-footnote {
+    padding: 0 0 16px;
   }
 
   .overview-grid,
@@ -787,6 +1033,22 @@ tfoot td {
 
   .table-wrap {
     padding: 0 10px 12px;
+  }
+
+  .treemap-wrap,
+  .treemap-footnote {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .treemap-canvas {
+    min-height: 900px;
+  }
+
+  .treemap-super-head,
+  .treemap-category-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   tbody td,

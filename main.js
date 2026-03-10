@@ -7,8 +7,143 @@ const LIVE_PRICE_PROXY_BASE_URL = "https://r.jina.ai/http://";
 const YAHOO_SPARK_BASE_URL = "https://query1.finance.yahoo.com/v7/finance/spark";
 const YAHOO_SPARK_BATCH_SIZE = 20;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const TREEMAP_LAYOUT_ORDER_BY_SUPER = {
+  "해외": ["SCHD", "S&P500", "Nasdaq", "커버드콜", "부동산/리츠", "채권", "USD", "기타"],
+  "국내": ["배당ETF", "인프라", "통신", "제조", "금융", "원화", "MM"],
+};
+const TREEMAP_LAYOUT_ORDER_GLOBAL = [
+  "SCHD",
+  "S&P500",
+  "Nasdaq",
+  "커버드콜",
+  "부동산/리츠",
+  "채권",
+  "USD",
+  "배당ETF",
+  "인프라",
+  "통신",
+  "제조",
+  "금융",
+  "원화",
+  "MM",
+  "기타",
+];
+const CATEGORY_TICKER_RULES = {
+  "SCHD": [
+    "SCHD",
+    "TIGER 미국배당다우존스",
+    "SOL 미국배당다우존스2호",
+    "SOL 미국배당다우존스",
+  ],
+  "Nasdaq": [
+    "QQQ",
+    "KODEX 미국나스닥100",
+    "TIGER 미국나스닥100레버리지(합성)",
+    "KODEX 미국반도체",
+    "KODEX 미국휴머노이드로봇",
+  ],
+  "S&P500": [
+    "VOO",
+    "KODEX 미국S&P500",
+    "ACE 미국S&P500미국채혼합50액티브",
+  ],
+  "커버드콜": [
+    "JEPQ",
+    "JEPI",
+    "TIGER 미국배당다우존스타겟커버드콜2호",
+    "KODEX 미국성장커버드콜액티브",
+    "KODEX 미국배당커버드콜액티브",
+  ],
+  "인프라": [
+    "KODEX 한국부동산리츠인프라",
+  ],
+  "부동산/리츠": [
+    "AGNC",
+    "O",
+  ],
+  "채권": [
+    "IEF",
+    "TLT",
+  ],
+  "배당ETF": [
+    "PLUS 고배당주채권혼합",
+    "PLUS 자사주매입고배당주",
+    "KODEX 200타겟위클리커버드콜",
+    "TIGER 코리아배당다우존스",
+  ],
+  "원화": [
+    "자동운용상품(고유계정대)",
+    "KRW",
+  ],
+  "MM": [
+    "KODEX 머니마켓액티브",
+  ],
+  "USD": [
+    "USD",
+  ],
+  "기타": [
+    "ULTY",
+  ],
+};
+const CATEGORY_NAME_ALIASES = {
+  "유틸리티": "인프라",
+  "utility": "인프라",
+  "utilities": "인프라",
+  "국내 배당": "배당ETF",
+  "국내배당": "배당ETF",
+  "VOO": "S&P500",
+  "QQQ": "Nasdaq",
+  "미국 커버드콜": "커버드콜",
+  "현금(USD)": "USD",
+  "운송물류": "제조",
+  "통신사": "통신",
+  "미국 국채": "채권",
+};
+const SUPER_CATEGORY_RULES = {
+  "해외": [
+    "커버드콜",
+    "SCHD",
+    "S&P500",
+    "Nasdaq",
+    "부동산/리츠",
+    "채권",
+    "USD",
+    "기타",
+  ],
+  "국내": [
+    "금융",
+    "인프라",
+    "배당ETF",
+    "제조",
+    "통신",
+    "원화",
+    "MM",
+  ],
+};
+const TREEMAP_SUPER_CATEGORY_ORDER = Object.keys(TREEMAP_LAYOUT_ORDER_BY_SUPER);
+const TREEMAP_CATEGORY_COLORS = {
+  "SCHD": "#77d7ff",
+  "S&P500": "#86abff",
+  Nasdaq: "#8e93ff",
+  "커버드콜": "#ff8ca1",
+  "부동산/리츠": "#5dd4c0",
+  "채권": "#77c8d2",
+  USD: "#ffd66b",
+  "배당ETF": "#8adc78",
+  "인프라": "#57d7ae",
+  "통신": "#68a8ff",
+  "제조": "#ffb067",
+  "금융": "#d7a0ff",
+  "원화": "#aab8d6",
+  MM: "#ffc887",
+  "기타": "#98a4c3",
+};
 
 const currencyFormatter = new Intl.NumberFormat("ko-KR");
+const compactCurrencyFormatter = new Intl.NumberFormat("ko-KR", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 const quantityFormatter = new Intl.NumberFormat("ko-KR", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 6,
@@ -43,8 +178,47 @@ const state = {
   refreshTimerId: null,
 };
 
+function normalizeTreemapToken(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+const treemapCategoryLookup = Object.entries(CATEGORY_TICKER_RULES).reduce(
+  (lookup, [category, values]) => {
+    values.forEach((value) => {
+      lookup.set(normalizeTreemapToken(value), category);
+    });
+    return lookup;
+  },
+  new Map(),
+);
+const treemapAliasLookup = new Map(
+  Object.entries(CATEGORY_NAME_ALIASES).map(([alias, category]) => [
+    normalizeTreemapToken(alias),
+    category,
+  ]),
+);
+const treemapSuperCategoryLookup = Object.entries(SUPER_CATEGORY_RULES).reduce(
+  (lookup, [superCategory, categories]) => {
+    categories.forEach((category) => {
+      lookup.set(category, superCategory);
+    });
+    return lookup;
+  },
+  new Map(),
+);
+const treemapCategoryOrderLookup = new Map(
+  TREEMAP_LAYOUT_ORDER_GLOBAL.map((category, index) => [category, index]),
+);
+
 function formatCurrency(value) {
   return `${currencyFormatter.format(Math.round(value))}원`;
+}
+
+function formatCompactCurrency(value) {
+  return `${compactCurrencyFormatter.format(Math.round(value))}원`;
 }
 
 function formatSignedCurrency(value) {
@@ -617,6 +791,465 @@ function buildBookData(source, livePriceSource) {
   };
 }
 
+function getTreemapCategoryOrder(superCategory, category) {
+  const superOrder = TREEMAP_LAYOUT_ORDER_BY_SUPER[superCategory] ?? [];
+  const superIndex = superOrder.indexOf(category);
+
+  if (superIndex !== -1) {
+    return superIndex;
+  }
+
+  if (treemapCategoryOrderLookup.has(category)) {
+    return superOrder.length + treemapCategoryOrderLookup.get(category);
+  }
+
+  return superOrder.length + TREEMAP_LAYOUT_ORDER_GLOBAL.length;
+}
+
+function resolveTreemapCategory(asset) {
+  const candidates = [asset.category, asset.name, asset.ticker, asset.type]
+    .map(normalizeTreemapToken)
+    .filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (treemapAliasLookup.has(candidate)) {
+      return treemapAliasLookup.get(candidate);
+    }
+
+    if (treemapCategoryLookup.has(candidate)) {
+      return treemapCategoryLookup.get(candidate);
+    }
+  }
+
+  const fullText = normalizeTreemapToken(
+    [asset.name, asset.type, asset.ticker].filter(Boolean).join(" "),
+  );
+
+  if (asset.ticker === "KRW" || fullText.includes("원화") || fullText.includes("고유계정대")) {
+    return "원화";
+  }
+
+  if (asset.ticker === "USD" || fullText.includes("현금(usd)")) {
+    return "USD";
+  }
+
+  if (fullText.includes("머니마켓")) {
+    return "MM";
+  }
+
+  if (fullText.includes("인프라")) {
+    return "인프라";
+  }
+
+  if (fullText.includes("텔레콤") || fullText.includes("통신")) {
+    return "통신";
+  }
+
+  if (/(금융|은행|증권|보험)/.test(fullText)) {
+    return "금융";
+  }
+
+  if (/(현대차|자동차|제조)/.test(fullText)) {
+    return "제조";
+  }
+
+  return "기타";
+}
+
+function resolveTreemapSuperCategory(asset, category) {
+  if (asset.superCategory && TREEMAP_LAYOUT_ORDER_BY_SUPER[asset.superCategory]) {
+    return asset.superCategory;
+  }
+
+  if (treemapSuperCategoryLookup.has(category)) {
+    return treemapSuperCategoryLookup.get(category);
+  }
+
+  return asset.currency === "USD" ? "해외" : "국내";
+}
+
+function buildTreemapData(book) {
+  if (!book.overview.totalAssets) {
+    return null;
+  }
+
+  const assetMap = new Map();
+
+  book.portfolios.forEach((portfolio) => {
+    portfolio.holdings.forEach((holding) => {
+      const key = `${holding.currency}:${holding.ticker}`;
+      const existingAsset = assetMap.get(key) ?? {
+        ticker: holding.ticker,
+        name: holding.name,
+        type: holding.type,
+        currency: holding.currency,
+        marketValueBase: 0,
+        accountNames: new Set(),
+      };
+
+      existingAsset.marketValueBase += holding.marketValueBase;
+      existingAsset.accountNames.add(portfolio.name);
+      assetMap.set(key, existingAsset);
+    });
+
+    if (portfolio.cash > 0) {
+      const key = "KRW:KRW";
+      const existingCash = assetMap.get(key) ?? {
+        ticker: "KRW",
+        name: "원화 현금",
+        type: "현금",
+        currency: "KRW",
+        marketValueBase: 0,
+        accountNames: new Set(),
+      };
+
+      existingCash.marketValueBase += portfolio.cash;
+      existingCash.accountNames.add(portfolio.name);
+      assetMap.set(key, existingCash);
+    }
+  });
+
+  const assets = [...assetMap.values()]
+    .filter((asset) => asset.marketValueBase > 0)
+    .map((asset) => {
+      const category = resolveTreemapCategory(asset);
+      const superCategory = resolveTreemapSuperCategory(asset, category);
+
+      return {
+        ...asset,
+        accountCount: asset.accountNames.size,
+        weight: asset.marketValueBase / book.overview.totalAssets,
+        category,
+        superCategory,
+      };
+    });
+
+  const superCategoryMap = new Map();
+
+  assets.forEach((asset) => {
+    const existingSuperCategory = superCategoryMap.get(asset.superCategory) ?? {
+      id: normalizeTreemapToken(asset.superCategory).replace(/\s+/g, "-"),
+      name: asset.superCategory,
+      marketValueBase: 0,
+      categories: new Map(),
+    };
+    const existingCategory = existingSuperCategory.categories.get(asset.category) ?? {
+      id: `${existingSuperCategory.id}-${normalizeTreemapToken(asset.category).replace(/\s+/g, "-")}`,
+      name: asset.category,
+      superCategory: asset.superCategory,
+      marketValueBase: 0,
+      assets: [],
+    };
+
+    existingCategory.marketValueBase += asset.marketValueBase;
+    existingCategory.assets.push(asset);
+    existingSuperCategory.marketValueBase += asset.marketValueBase;
+    existingSuperCategory.categories.set(asset.category, existingCategory);
+    superCategoryMap.set(asset.superCategory, existingSuperCategory);
+  });
+
+  const superCategories = [...superCategoryMap.values()]
+    .map((superCategory) => {
+      const categories = [...superCategory.categories.values()]
+        .map((category) => ({
+          ...category,
+          weight: category.marketValueBase / book.overview.totalAssets,
+          assets: [...category.assets].sort(
+            (left, right) =>
+              right.marketValueBase - left.marketValueBase ||
+              left.name.localeCompare(right.name, "ko-KR"),
+          ),
+        }))
+        .sort(
+          (left, right) =>
+            getTreemapCategoryOrder(superCategory.name, left.name) -
+              getTreemapCategoryOrder(superCategory.name, right.name) ||
+            right.marketValueBase - left.marketValueBase,
+        );
+
+      return {
+        id: superCategory.id,
+        name: superCategory.name,
+        marketValueBase: superCategory.marketValueBase,
+        weight: superCategory.marketValueBase / book.overview.totalAssets,
+        categories,
+      };
+    })
+    .sort((left, right) => {
+      const leftIndex = TREEMAP_SUPER_CATEGORY_ORDER.indexOf(left.name);
+      const rightIndex = TREEMAP_SUPER_CATEGORY_ORDER.indexOf(right.name);
+
+      if (leftIndex !== -1 || rightIndex !== -1) {
+        const normalizedLeftIndex = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
+        const normalizedRightIndex = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
+        return normalizedLeftIndex - normalizedRightIndex;
+      }
+
+      return right.marketValueBase - left.marketValueBase;
+    });
+
+  return {
+    totalAssets: book.overview.totalAssets,
+    assetCount: assets.length,
+    superCategories,
+  };
+}
+
+function findTreemapSplitIndex(items) {
+  const totalValue = items.reduce((sum, item) => sum + item.value, 0);
+  let runningValue = 0;
+  let bestIndex = 1;
+  let bestDifference = Number.POSITIVE_INFINITY;
+
+  for (let index = 1; index < items.length; index += 1) {
+    runningValue += items[index - 1].value;
+    const difference = Math.abs(totalValue / 2 - runningValue);
+
+    if (difference < bestDifference) {
+      bestDifference = difference;
+      bestIndex = index;
+    }
+  }
+
+  return bestIndex;
+}
+
+function buildTreemapLayouts(
+  items,
+  rect = { x: 0, y: 0, width: 100, height: 100 },
+) {
+  const filteredItems = items.filter((item) => item.value > 0);
+
+  if (!filteredItems.length) {
+    return [];
+  }
+
+  if (filteredItems.length === 1) {
+    return [
+      {
+        node: filteredItems[0].node,
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      },
+    ];
+  }
+
+  const totalValue = filteredItems.reduce((sum, item) => sum + item.value, 0);
+  const splitIndex = findTreemapSplitIndex(filteredItems);
+  const firstItems = filteredItems.slice(0, splitIndex);
+  const secondItems = filteredItems.slice(splitIndex);
+  const firstValue = firstItems.reduce((sum, item) => sum + item.value, 0);
+  const firstRatio = firstValue / totalValue;
+  const splitVertically = rect.width >= rect.height;
+  const firstRect = splitVertically
+    ? {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width * firstRatio,
+        height: rect.height,
+      }
+    : {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height * firstRatio,
+      };
+  const secondRect = splitVertically
+    ? {
+        x: rect.x + firstRect.width,
+        y: rect.y,
+        width: rect.width - firstRect.width,
+        height: rect.height,
+      }
+    : {
+        x: rect.x,
+        y: rect.y + firstRect.height,
+        width: rect.width,
+        height: rect.height - firstRect.height,
+      };
+
+  return [
+    ...buildTreemapLayouts(firstItems, firstRect),
+    ...buildTreemapLayouts(secondItems, secondRect),
+  ];
+}
+
+function hexToRgba(hex, alpha) {
+  const normalizedHex = hex.replace("#", "");
+  const red = Number.parseInt(normalizedHex.slice(0, 2), 16);
+  const green = Number.parseInt(normalizedHex.slice(2, 4), 16);
+  const blue = Number.parseInt(normalizedHex.slice(4, 6), 16);
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+function getTreemapAccent(category, superCategory) {
+  return (
+    TREEMAP_CATEGORY_COLORS[category] ??
+    (superCategory === "해외" ? "#62a8ff" : "#70d7a5")
+  );
+}
+
+function buildTreemapStyle(layout, accent) {
+  return [
+    `left:${layout.x.toFixed(4)}%`,
+    `top:${layout.y.toFixed(4)}%`,
+    `width:${layout.width.toFixed(4)}%`,
+    `height:${layout.height.toFixed(4)}%`,
+    `--treemap-accent:${accent}`,
+    `--treemap-accent-soft:${hexToRgba(accent, 0.13)}`,
+    `--treemap-accent-strong:${hexToRgba(accent, 0.24)}`,
+    `--treemap-outline:${hexToRgba(accent, 0.34)}`,
+  ].join(";");
+}
+
+function getTreemapTileSizeClass(layout) {
+  const area = layout.width * layout.height;
+
+  if (area >= 1400) {
+    return "tile-xl";
+  }
+
+  if (area >= 650) {
+    return "tile-lg";
+  }
+
+  if (area >= 240) {
+    return "tile-md";
+  }
+
+  if (area >= 90) {
+    return "tile-sm";
+  }
+
+  return "tile-xs";
+}
+
+function renderTreemapAssetTile(layout) {
+  const asset = layout.node;
+  const sizeClass = getTreemapTileSizeClass(layout);
+  const accent = getTreemapAccent(asset.category, asset.superCategory);
+  const positionType =
+    asset.type === "현금"
+      ? asset.accountCount > 1
+        ? `${asset.accountCount}계좌 현금 합산`
+        : "현금"
+      : asset.accountCount > 1
+        ? `${asset.accountCount}계좌 합산`
+        : asset.type;
+
+  return `
+    <article class="treemap-tile ${sizeClass}" style="${buildTreemapStyle(layout, accent)}">
+      <div class="treemap-tile-inner">
+        <div class="treemap-tile-head">
+          <strong class="treemap-tile-name">${asset.name}</strong>
+          ${asset.currency !== "KRW" ? `<span class="treemap-tile-badge">${asset.currency}</span>` : ""}
+        </div>
+        <div class="treemap-tile-body">
+          <span class="treemap-tile-value">${formatCompactCurrency(asset.marketValueBase)}</span>
+          <span class="treemap-tile-meta">${formatPercent(asset.weight)}</span>
+          <span class="treemap-tile-meta">${positionType}</span>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderTreemapCategoryTile(layout) {
+  const category = layout.node;
+  const sizeClass = getTreemapTileSizeClass(layout);
+  const accent = getTreemapAccent(category.name, category.superCategory);
+  const assetLayouts = buildTreemapLayouts(
+    category.assets.map((asset) => ({
+      node: asset,
+      value: asset.marketValueBase,
+    })),
+  );
+
+  return `
+    <article class="treemap-category ${sizeClass}" style="${buildTreemapStyle(layout, accent)}">
+      <div class="treemap-category-head">
+        <strong>${category.name}</strong>
+        <span>${formatCompactCurrency(category.marketValueBase)} · ${formatPercent(category.weight)}</span>
+      </div>
+      <div class="treemap-category-body">
+        ${assetLayouts.map(renderTreemapAssetTile).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function renderTreemapSuperCategoryTile(layout) {
+  const superCategory = layout.node;
+  const sizeClass = getTreemapTileSizeClass(layout);
+  const accent = getTreemapAccent(superCategory.name, superCategory.name);
+  const categoryLayouts = buildTreemapLayouts(
+    superCategory.categories.map((category) => ({
+      node: category,
+      value: category.marketValueBase,
+    })),
+  );
+
+  return `
+    <section class="treemap-super ${sizeClass}" style="${buildTreemapStyle(layout, accent)}">
+      <div class="treemap-super-head">
+        <div>
+          <p class="treemap-super-label">${superCategory.name}</p>
+          <strong class="treemap-super-value">${formatCompactCurrency(superCategory.marketValueBase)}</strong>
+        </div>
+        <span class="treemap-super-share">${formatPercent(superCategory.weight)}</span>
+      </div>
+      <div class="treemap-super-body">
+        ${categoryLayouts.map(renderTreemapCategoryTile).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderTreemapSection(book) {
+  const treemap = buildTreemapData(book);
+
+  if (!treemap || !treemap.superCategories.length) {
+    return "";
+  }
+
+  const superCategoryLayouts = buildTreemapLayouts(
+    treemap.superCategories.map((superCategory) => ({
+      node: superCategory,
+      value: superCategory.marketValueBase,
+    })),
+  );
+
+  return `
+    <section class="treemap-card">
+      <div class="section-head">
+        <div>
+          <h2 class="section-title">전체 종목 트리맵</h2>
+          <p class="section-copy">
+            면적은 전체 포트폴리오 내 원화 환산 평가금액 비중입니다. 해외와 국내를 먼저 나누고, 그 안에서 주신 분류 규칙 기준으로 카테고리와 종목을 묶었습니다.
+            같은 종목을 여러 계좌에서 들고 있으면 한 타일로 합산해서 보여줍니다.
+          </p>
+        </div>
+        <div class="section-pill">총 ${currencyFormatter.format(treemap.assetCount)}자산</div>
+      </div>
+
+      <div class="treemap-wrap">
+        <div class="treemap-canvas">
+          ${superCategoryLayouts.map(renderTreemapSuperCategoryTile).join("")}
+        </div>
+      </div>
+
+      <div class="treemap-footnote">
+        <span>면적 = KRW 환산 평가금액</span>
+        <span>중복 보유 = 계좌별 합산</span>
+        <span>현금 = 원화 현금 타일로 별도 집계</span>
+      </div>
+    </section>
+  `;
+}
+
 function buildMarketStatus(book) {
   const hasStoredQuotes = hasAppliedStoredQuotes(book);
 
@@ -887,8 +1520,8 @@ function renderTableRows(portfolio) {
 
 function renderPortfolioSection(portfolio) {
   const heroCopy = portfolio.hasForeignCurrency
-    ? `${portfolio.snapshotLabel} 기준 원장 데이터를 유지하고, 현재가와 환율만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어 계산합니다. 달러 종목은 USD 기준으로 표기하고 계좌 합계와 비중은 KRW 환산으로 계산합니다.`
-    : `${portfolio.snapshotLabel} 기준 원장 데이터를 유지하고, 현재가만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어 평가금액과 손익을 재계산합니다.`;
+    ? `${portfolio.snapshotLabel} 원장 데이터를 유지하고, 현재가와 환율만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어 계산합니다. 달러 종목은 USD 기준으로 표기하고 계좌 합계와 비중은 KRW 환산으로 계산합니다.`
+    : `${portfolio.snapshotLabel} 원장 데이터를 유지하고, 현재가만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어 평가금액과 손익을 재계산합니다.`;
   const tableCopy = portfolio.hasForeignCurrency
     ? "수량과 매입금액은 고정 원장 데이터입니다. 해외 종목 금액은 USD 기준으로 표기하고, 계좌 합계와 비중은 KRW 환산 기준으로 계산합니다."
     : "수량과 매입금액은 고정 원장 데이터입니다. 현재가, 평가금액, 손익, 수익률은 최신 시세 기준으로 다시 계산됩니다.";
@@ -1039,10 +1672,12 @@ function renderApp(book) {
           <div>
             <h2 class="section-title">계좌 한눈에 보기</h2>
             <p class="section-copy">
-              각 계좌의 총자산, 손익, 현금, 투자 비중을 먼저 비교하고 필요한 계좌만 아래 상세 표로 내려가면 됩니다.
+              전체 종목 트리맵으로 비중을 먼저 보고, 각 계좌의 총자산, 손익, 현금, 투자 비중은 아래 카드와 비교표에서 이어서 확인하면 됩니다.
             </p>
           </div>
         </div>
+
+        ${renderTreemapSection(book)}
 
         <div class="overview-layout">
           <div class="overview-grid">
