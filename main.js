@@ -3,14 +3,10 @@ const LIVE_PRICES_URL = "./data/live-prices.json";
 const GITHUB_API_BASE_URL = "https://api.github.com/repos/gusdnr0226/portfolio";
 const GITHUB_LIVE_PRICES_URL =
   `${GITHUB_API_BASE_URL}/contents/data/live-prices.json?ref=main`;
-const GITHUB_ACTIONS_WORKFLOW_ID = "update-live-prices.yml";
-const GITHUB_DEFAULT_BRANCH = "main";
-const GITHUB_TOKEN_STORAGE_KEY = "portfolio.refresh.githubToken";
+const LIVE_PRICE_PROXY_BASE_URL = "https://r.jina.ai/http://";
+const YAHOO_SPARK_BASE_URL = "https://query1.finance.yahoo.com/v7/finance/spark";
+const YAHOO_SPARK_BATCH_SIZE = 20;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-const WORKFLOW_POLL_INTERVAL_MS = 2500;
-const WORKFLOW_DISCOVERY_TIMEOUT_MS = 30 * 1000;
-const WORKFLOW_COMPLETION_TIMEOUT_MS = 120 * 1000;
-const LIVE_PRICE_VISIBILITY_TIMEOUT_MS = 20 * 1000;
 
 const currencyFormatter = new Intl.NumberFormat("ko-KR");
 const decimalFormatter = new Intl.NumberFormat("ko-KR", {
@@ -94,12 +90,6 @@ function getErrorMessage(error) {
   return String(error);
 }
 
-function delay(ms) {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-}
-
 async function fetchJson(url, options = {}) {
   const requestUrl = new URL(url, window.location.href);
   requestUrl.searchParams.set("ts", `${Date.now()}`);
@@ -116,37 +106,23 @@ async function fetchJson(url, options = {}) {
   return response.json();
 }
 
-function getStoredGitHubToken() {
-  try {
-    const value = window.localStorage.getItem(GITHUB_TOKEN_STORAGE_KEY);
-    return value?.trim() || null;
-  } catch {
-    return null;
-  }
-}
+async function fetchText(url, options = {}) {
+  const response = await fetch(url, {
+    cache: "no-store",
+    ...options,
+  });
 
-function setStoredGitHubToken(token) {
-  try {
-    window.localStorage.setItem(GITHUB_TOKEN_STORAGE_KEY, token);
-  } catch {
-    // Ignore storage failures and continue with the active token only.
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}: ${response.status}`);
   }
-}
 
-function clearStoredGitHubToken() {
-  try {
-    window.localStorage.removeItem(GITHUB_TOKEN_STORAGE_KEY);
-  } catch {
-    // Ignore storage failures.
-  }
-}
-
-function hasStoredGitHubToken() {
-  return Boolean(getStoredGitHubToken());
+  return response.text();
 }
 
 function isAutomaticLivePriceSource(livePriceSource) {
-  return livePriceSource?.provider === "KIS Open API";
+  return ["KIS Open API", "Yahoo Finance via r.jina.ai"].includes(
+    livePriceSource?.provider,
+  );
 }
 
 function getUpdatedAtTimestamp(livePriceSource) {
@@ -162,6 +138,10 @@ function hasUsableQuote(quote) {
   return Number.isFinite(quote?.price);
 }
 
+function countUsableQuotes(livePriceSource) {
+  return Object.values(livePriceSource?.quotes ?? {}).filter(hasUsableQuote).length;
+}
+
 function hasAppliedStoredQuotes(book) {
   return book.portfolios.some((portfolio) =>
     portfolio.holdings.some(
@@ -173,6 +153,13 @@ function hasAppliedStoredQuotes(book) {
 function choosePreferredLivePriceSource(current, candidate) {
   if (!current) {
     return candidate;
+  }
+
+  const currentQuoteCount = countUsableQuotes(current);
+  const candidateQuoteCount = countUsableQuotes(candidate);
+
+  if (currentQuoteCount !== candidateQuoteCount) {
+    return candidateQuoteCount > currentQuoteCount ? candidate : current;
   }
 
   const currentIsAutomatic = isAutomaticLivePriceSource(current);
@@ -217,59 +204,116 @@ function decodeBase64Json(content) {
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
-function buildGitHubApiUrl(path, params = {}) {
-  const url = new URL(`${GITHUB_API_BASE_URL}${path}`);
-  url.searchParams.set("ts", `${Date.now()}`);
+function getExternalQuoteTickers(portfolioSource) {
+  if (!portfolioSource?.accounts) {
+    return [];
+  }
 
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      url.searchParams.set(key, `${value}`);
-    }
-  });
-
-  return url;
+  return [
+    ...new Set(
+      portfolioSource.accounts.flatMap((account) =>
+        account.holdings
+          .filter((holding) => !holding.manualPriceOnly)
+          .map((holding) => holding.ticker),
+      ),
+    ),
+  ];
 }
 
-async function fetchGitHubApi(path, { token, method = "GET", body, params } = {}) {
-  const headers = {
-    accept: "application/vnd.github+json",
-    "x-github-api-version": "2022-11-28",
-  };
+function toYahooSymbol(ticker) {
+  return `${ticker}.KS`;
+}
 
-  if (token) {
-    headers.authorization = `Bearer ${token}`;
+function toTickerFromYahooSymbol(symbol) {
+  return symbol.replace(/\.KS$/i, "");
+}
+
+function chunkArray(values, size) {
+  const chunks = [];
+
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
   }
 
-  if (body) {
-    headers["content-type"] = "application/json";
+  return chunks;
+}
+
+function extractJsonPayload(text) {
+  const trimmedText = text.trim();
+
+  if (trimmedText.startsWith("{") || trimmedText.startsWith("[")) {
+    return JSON.parse(trimmedText);
   }
 
-  const response = await fetch(buildGitHubApiUrl(path, params), {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const marker = "Markdown Content:";
+  const body = trimmedText.includes(marker)
+    ? trimmedText.slice(trimmedText.indexOf(marker) + marker.length)
+    : trimmedText;
+  const firstBraceIndex = body.indexOf("{");
+  const lastBraceIndex = body.lastIndexOf("}");
 
-  let payload = null;
+  if (firstBraceIndex === -1 || lastBraceIndex === -1 || lastBraceIndex < firstBraceIndex) {
+    throw new Error("외부 시세 응답에서 JSON 본문을 찾지 못했습니다.");
+  }
 
-  if (response.status !== 204) {
-    try {
-      payload = await response.json();
-    } catch {
-      payload = null;
+  return JSON.parse(body.slice(firstBraceIndex, lastBraceIndex + 1));
+}
+
+function buildYahooSparkProxyUrl(symbols) {
+  const yahooUrl = new URL(YAHOO_SPARK_BASE_URL);
+  yahooUrl.searchParams.set("symbols", symbols.join(","));
+  yahooUrl.searchParams.set("range", "1d");
+  yahooUrl.searchParams.set("interval", "1d");
+  yahooUrl.searchParams.set("indicators", "close");
+  yahooUrl.searchParams.set("_", `${Date.now()}`);
+
+  return `${LIVE_PRICE_PROXY_BASE_URL}${yahooUrl.toString()}`;
+}
+
+function getYahooSparkPrice(result) {
+  const response = Array.isArray(result?.response) ? result.response[0] : null;
+  const metaPrice = response?.meta?.regularMarketPrice;
+
+  if (Number.isFinite(metaPrice)) {
+    return metaPrice;
+  }
+
+  const closePrices = response?.indicators?.quote?.[0]?.close;
+
+  if (!Array.isArray(closePrices)) {
+    return null;
+  }
+
+  for (let index = closePrices.length - 1; index >= 0; index -= 1) {
+    if (Number.isFinite(closePrices[index])) {
+      return closePrices[index];
     }
   }
 
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      clearStoredGitHubToken();
-    }
+  return null;
+}
 
-    const message = payload?.message ? `: ${payload.message}` : "";
-    throw new Error(`GitHub API 요청 실패 (${response.status})${message}`);
+async function fetchYahooSparkBatch(symbols) {
+  const payload = extractJsonPayload(await fetchText(buildYahooSparkProxyUrl(symbols)));
+  const results = payload?.spark?.result;
+
+  if (!Array.isArray(results)) {
+    throw new Error("Yahoo Finance 응답 형식이 예상과 다릅니다.");
   }
 
-  return payload;
+  return results.reduce((quotes, result) => {
+    const symbol = result?.symbol ?? result?.response?.[0]?.meta?.symbol;
+    const price = getYahooSparkPrice(result);
+
+    if (!symbol || !Number.isFinite(price)) {
+      return quotes;
+    }
+
+    quotes[toTickerFromYahooSymbol(symbol)] = {
+      price,
+    };
+    return quotes;
+  }, {});
 }
 
 async function fetchLocalLivePrices() {
@@ -277,11 +321,10 @@ async function fetchLocalLivePrices() {
   return normalizeLivePriceSource(payload, "deployed-file");
 }
 
-async function fetchGitHubLivePrices(token) {
+async function fetchGitHubLivePrices() {
   const payload = await fetchJson(GITHUB_LIVE_PRICES_URL, {
     headers: {
       accept: "application/vnd.github+json",
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
   });
 
@@ -292,31 +335,74 @@ async function fetchGitHubLivePrices(token) {
   return normalizeLivePriceSource(decodeBase64Json(payload.content), "github-main");
 }
 
-async function loadLivePrices({ includeRepo = false, githubToken = null } = {}) {
-  let localSource = null;
-  let githubSource = null;
-  let lastError = null;
+async function fetchYahooLivePrices(tickers) {
+  const uniqueSymbols = [...new Set(tickers.map(toYahooSymbol))];
 
-  try {
-    localSource = await fetchLocalLivePrices();
-  } catch (error) {
-    lastError = error;
+  if (!uniqueSymbols.length) {
+    throw new Error("외부 시세를 조회할 종목이 없습니다.");
   }
 
-  const shouldCheckGitHub =
-    includeRepo || !localSource || localSource.provider === "snapshot-fallback";
+  const batchResults = await Promise.allSettled(
+    chunkArray(uniqueSymbols, YAHOO_SPARK_BATCH_SIZE).map((symbols) =>
+      fetchYahooSparkBatch(symbols),
+    ),
+  );
+  const quotes = {};
+  let lastError = null;
 
-  if (shouldCheckGitHub) {
+  batchResults.forEach((result) => {
+    if (result.status === "fulfilled") {
+      Object.assign(quotes, result.value);
+      return;
+    }
+
+    lastError ??= result.reason;
+  });
+
+  if (!countUsableQuotes({ quotes })) {
+    throw lastError ?? new Error("Yahoo Finance에서 시세를 읽지 못했습니다.");
+  }
+
+  return normalizeLivePriceSource(
+    {
+      provider: "Yahoo Finance via r.jina.ai",
+      updatedAt: new Date().toISOString(),
+      quotes,
+    },
+    "yahoo-spark-proxy",
+  );
+}
+
+async function loadLivePrices({ includeRepo = false, externalTickers = [] } = {}) {
+  const requests = [
+    () => fetchLocalLivePrices(),
+    ...(externalTickers.length ? [() => fetchYahooLivePrices(externalTickers)] : []),
+  ];
+  const results = await Promise.allSettled(requests.map((request) => request()));
+  const sources = [];
+  let lastError = null;
+
+  results.forEach((result) => {
+    if (result.status === "fulfilled") {
+      sources.push(result.value);
+      return;
+    }
+
+    lastError ??= result.reason;
+  });
+
+  let selectedSource = sources.reduce(choosePreferredLivePriceSource, null);
+
+  if (includeRepo && !isAutomaticLivePriceSource(selectedSource)) {
     try {
-      githubSource = await fetchGitHubLivePrices(githubToken);
+      selectedSource = choosePreferredLivePriceSource(
+        selectedSource,
+        await fetchGitHubLivePrices(),
+      );
     } catch (error) {
       lastError ??= error;
     }
   }
-
-  const selectedSource = [localSource, githubSource]
-    .filter(Boolean)
-    .reduce(choosePreferredLivePriceSource, null);
 
   if (!selectedSource) {
     throw lastError ?? new Error("Failed to load live prices");
@@ -331,142 +417,6 @@ function renderCurrentBook() {
   }
 
   renderApp(buildBookData(state.portfolioSource, state.livePriceSource));
-}
-
-function setRefreshProgress({ phase = state.refreshPhase, detail = state.refreshDetail } = {}) {
-  state.refreshPhase = phase;
-  state.refreshDetail = detail;
-  renderCurrentBook();
-}
-
-function promptForGitHubToken({ allowEmpty = false } = {}) {
-  const existingToken = getStoredGitHubToken() ?? "";
-  const promptText = allowEmpty
-    ? "GitHub fine-grained token을 입력하세요. 빈 값을 입력하면 저장을 해제합니다."
-    : "즉시 시세 불러오기를 쓰려면 GitHub fine-grained token이 필요합니다. Actions 읽기/쓰기 권한이 있는 토큰을 입력하세요.";
-  const rawValue = window.prompt(promptText, existingToken);
-
-  if (rawValue === null) {
-    return null;
-  }
-
-  const token = rawValue.trim();
-
-  if (!token) {
-    if (allowEmpty) {
-      clearStoredGitHubToken();
-    }
-    return null;
-  }
-
-  setStoredGitHubToken(token);
-  return token;
-}
-
-async function dispatchLivePriceWorkflow(token) {
-  await fetchGitHubApi(`/actions/workflows/${GITHUB_ACTIONS_WORKFLOW_ID}/dispatches`, {
-    token,
-    method: "POST",
-    body: {
-      ref: GITHUB_DEFAULT_BRANCH,
-    },
-  });
-}
-
-async function waitForWorkflowRun(token, startedAfterMs) {
-  const deadline = Date.now() + WORKFLOW_DISCOVERY_TIMEOUT_MS;
-
-  while (Date.now() < deadline) {
-    const payload = await fetchGitHubApi(
-      `/actions/workflows/${GITHUB_ACTIONS_WORKFLOW_ID}/runs`,
-      {
-        token,
-        params: {
-          event: "workflow_dispatch",
-          branch: GITHUB_DEFAULT_BRANCH,
-          per_page: 10,
-        },
-      },
-    );
-
-    const run = payload?.workflow_runs?.find(
-      (workflowRun) => Date.parse(workflowRun.created_at) >= startedAfterMs,
-    );
-
-    if (run) {
-      return run;
-    }
-
-    await delay(WORKFLOW_POLL_INTERVAL_MS);
-  }
-
-  throw new Error("GitHub Actions 실행을 찾지 못했습니다. 토큰 권한을 확인해 주세요.");
-}
-
-function formatWorkflowConclusion(conclusion) {
-  switch (conclusion) {
-    case "success":
-      return "성공";
-    case "failure":
-      return "실패";
-    case "cancelled":
-      return "취소";
-    case "timed_out":
-      return "시간 초과";
-    case "action_required":
-      return "추가 작업 필요";
-    default:
-      return conclusion ?? "알 수 없음";
-  }
-}
-
-async function waitForWorkflowCompletion(token, runId) {
-  const deadline = Date.now() + WORKFLOW_COMPLETION_TIMEOUT_MS;
-
-  while (Date.now() < deadline) {
-    const run = await fetchGitHubApi(`/actions/runs/${runId}`, { token });
-
-    if (run.status === "completed") {
-      if (run.conclusion !== "success") {
-        throw new Error(
-          `시세 갱신 워크플로가 ${formatWorkflowConclusion(run.conclusion)} 상태로 끝났습니다. ${run.html_url}`,
-        );
-      }
-
-      return run;
-    }
-
-    await delay(WORKFLOW_POLL_INTERVAL_MS);
-  }
-
-  throw new Error("시세 갱신 워크플로 완료 대기 시간이 초과되었습니다.");
-}
-
-async function waitForFreshLivePrices(previousUpdatedAt, githubToken) {
-  const deadline = Date.now() + LIVE_PRICE_VISIBILITY_TIMEOUT_MS;
-  let lastSource = null;
-  let lastError = null;
-
-  while (Date.now() < deadline) {
-    try {
-      const source = await loadLivePrices({ includeRepo: true, githubToken });
-      lastSource = source;
-
-      if (getUpdatedAtTimestamp(source) > previousUpdatedAt) {
-        return source;
-      }
-    } catch (error) {
-      lastError = error;
-    }
-
-    await delay(WORKFLOW_POLL_INTERVAL_MS);
-  }
-
-  if (lastSource) {
-    return lastSource;
-  }
-
-  throw lastError ?? new Error("갱신된 가격 파일을 아직 읽지 못했습니다.");
 }
 
 function buildPortfolioData(source, livePriceSource) {
@@ -582,13 +532,10 @@ function buildMarketStatus(book) {
   if (state.isRefreshing) {
     return {
       tone: "status-loading",
-      title:
-        state.refreshPhase === "remote"
-          ? "즉시 시세 갱신 실행 중"
-          : "외부 시세 다시 불러오는 중",
+      title: "외부 시세 다시 불러오는 중",
       detail:
         state.refreshDetail ??
-        "배포된 가격 파일과 저장소 원본을 순서대로 확인하고 있습니다.",
+        "Yahoo Finance 시세를 직접 확인하고, 실패하면 저장된 가격 파일을 사용합니다.",
     };
   }
 
@@ -603,7 +550,7 @@ function buildMarketStatus(book) {
   if (isAutomaticLivePriceSource(book.livePriceSource)) {
     return {
       tone: "status-live",
-      title: "외부 시세 자동 갱신 사용 중",
+      title: "외부 시세 자동 반영 중",
       detail: `${book.livePriceSource.provider} · 최근 반영 ${formatUpdatedAt(book.livePriceSource.updatedAt)}`,
     };
   }
@@ -641,7 +588,7 @@ function getPriceSourceLabel(priceSource) {
 function getPriceSourceDetail(priceSource) {
   switch (priceSource) {
     case "live":
-      return "외부 시세 반영";
+      return "외부 시세 직접 반영";
     case "stored":
       return "최근 저장 시세 반영";
     case "manual":
@@ -715,7 +662,7 @@ function renderBookSummaryCards(book) {
     {
       label: "총 보유 종목",
       value: `${currencyFormatter.format(book.overview.holdingsCount)}개`,
-      detail: "현재가만 자동 갱신, 수량/평단은 원장 기준",
+      detail: "현재가만 외부 시세로 갱신, 수량/평단은 원장 기준",
       tone: "",
     },
   ];
@@ -883,7 +830,7 @@ function renderPortfolioSection(portfolio) {
           <div>
             <h2 class="hero-title">${portfolio.name}</h2>
             <p class="hero-copy">
-              ${portfolio.snapshotLabel} 기준 원장 데이터를 유지하고, 현재가만 저장된 최신 시세 파일에서 다시 읽어
+              ${portfolio.snapshotLabel} 기준 원장 데이터를 유지하고, 현재가만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어
               평가금액과 손익을 재계산합니다.
             </p>
           </div>
@@ -957,7 +904,7 @@ function renderLoading() {
     <section class="state-card">
       <p class="state-eyebrow">Loading</p>
       <h1 class="state-title">포트폴리오 데이터를 불러오는 중입니다.</h1>
-      <p class="state-copy">계좌 원장과 최신 현재가 파일을 확인하고 있습니다.</p>
+      <p class="state-copy">계좌 원장과 외부 현재가, 저장된 가격 파일을 순서대로 확인하고 있습니다.</p>
     </section>
   `;
 }
@@ -997,7 +944,7 @@ function renderApp(book) {
             <h1 class="hero-title">절세계좌 포트폴리오</h1>
             <p class="hero-copy">
               연금저축, 퇴직연금, ISA를 같은 기준으로 묶어 총자산, 손익, 현금, 핵심 보유 종목을 한 화면에서 점검할 수 있게 구성했습니다.
-              저장된 최신 가격 파일이 있으면 현재가 계산에 우선 반영하고, 없으면 마지막 스냅샷 가격으로 계산합니다.
+              브라우저에서 외부 시세를 직접 확인하고, 응답이 없으면 저장된 최신 가격 파일을 폴백으로 사용합니다.
             </p>
           </div>
           <div class="account-pill">기준 통화 ${book.meta.currency}</div>
@@ -1013,14 +960,7 @@ function renderApp(book) {
           </div>
           <div class="toolbar-actions">
             <button class="ghost-button" data-refresh-quotes ${state.isRefreshing ? "disabled" : ""}>
-              ${state.isRefreshing
-                ? state.refreshPhase === "remote"
-                  ? "즉시 갱신 중..."
-                  : "업데이트 중..."
-                : "시세 즉시 불러오기"}
-            </button>
-            <button class="ghost-button ghost-button-muted" data-manage-refresh-token ${state.isRefreshing ? "disabled" : ""}>
-              ${hasStoredGitHubToken() ? "토큰 변경" : "토큰 설정"}
+              ${state.isRefreshing ? "시세 불러오는 중..." : "시세 다시 불러오기"}
             </button>
           </div>
         </div>
@@ -1093,55 +1033,24 @@ function renderApp(book) {
   `;
 }
 
-async function refreshLivePrices({ triggerRemote = false } = {}) {
+async function refreshLivePrices() {
   if (!state.portfolioSource || state.isRefreshing) {
     return;
   }
 
-  const previousUpdatedAt = getUpdatedAtTimestamp(state.livePriceSource);
+  const externalTickers = getExternalQuoteTickers(state.portfolioSource);
   state.isRefreshing = true;
   state.refreshError = null;
-  state.refreshPhase = triggerRemote ? "remote" : "local";
-  state.refreshDetail = triggerRemote
-    ? "GitHub 토큰과 워크플로 권한을 확인하고 있습니다."
-    : "배포된 가격 파일과 저장소 원본을 순서대로 확인하고 있습니다.";
+  state.refreshPhase = "external";
+  state.refreshDetail =
+    "Yahoo Finance 시세를 직접 확인하고, 실패하면 저장된 가격 파일을 확인합니다.";
   renderCurrentBook();
 
   try {
-    if (triggerRemote) {
-      const token = getStoredGitHubToken() ?? promptForGitHubToken();
-
-      if (!token) {
-        return;
-      }
-
-      setRefreshProgress({
-        phase: "remote",
-        detail: "GitHub Actions에 최신 시세 갱신을 요청하고 있습니다.",
-      });
-      const requestStartedAt = Date.now() - 5000;
-      await dispatchLivePriceWorkflow(token);
-
-      setRefreshProgress({
-        phase: "remote",
-        detail: "GitHub Actions 실행을 기다리고 있습니다.",
-      });
-      const run = await waitForWorkflowRun(token, requestStartedAt);
-
-      setRefreshProgress({
-        phase: "remote",
-        detail: "한국투자 Open API에서 최신 시세를 불러오고 있습니다.",
-      });
-      await waitForWorkflowCompletion(token, run.id);
-
-      setRefreshProgress({
-        phase: "remote",
-        detail: "갱신된 가격 파일을 다시 읽고 있습니다.",
-      });
-      state.livePriceSource = await waitForFreshLivePrices(previousUpdatedAt, token);
-    } else {
-      state.livePriceSource = await loadLivePrices({ includeRepo: true });
-    }
+    state.livePriceSource = await loadLivePrices({
+      includeRepo: true,
+      externalTickers,
+    });
   } catch (error) {
     state.refreshError = error;
   } finally {
@@ -1167,9 +1076,13 @@ async function initializeApp() {
 
   try {
     state.portfolioSource = await fetchJson(PORTFOLIOS_URL);
+    const externalTickers = getExternalQuoteTickers(state.portfolioSource);
 
     try {
-      state.livePriceSource = await loadLivePrices();
+      state.livePriceSource = await loadLivePrices({
+        includeRepo: true,
+        externalTickers,
+      });
     } catch (error) {
       state.livePriceSource = null;
       state.refreshError = error;
@@ -1183,14 +1096,6 @@ async function initializeApp() {
 }
 
 document.addEventListener("click", (event) => {
-  const manageTokenButton = event.target.closest("[data-manage-refresh-token]");
-
-  if (manageTokenButton) {
-    promptForGitHubToken({ allowEmpty: true });
-    renderCurrentBook();
-    return;
-  }
-
   const refreshButton = event.target.closest("[data-refresh-quotes]");
 
   if (!refreshButton) {
@@ -1202,7 +1107,7 @@ document.addEventListener("click", (event) => {
     return;
   }
 
-  refreshLivePrices({ triggerRemote: true });
+  refreshLivePrices();
 });
 
 initializeApp();
