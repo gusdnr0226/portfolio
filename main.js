@@ -689,8 +689,6 @@ function getTopHoldings(portfolio, limit = 3) {
 function renderAccountOverviewCards(book) {
   return book.portfolios
     .map((portfolio) => {
-      const topHoldings = getTopHoldings(portfolio);
-
       return `
         <article class="overview-card">
           <div class="overview-card-head">
@@ -718,19 +716,6 @@ function renderAccountOverviewCards(book) {
               <span>보유 종목</span>
               <strong>${currencyFormatter.format(portfolio.holdings.length)}개</strong>
             </div>
-          </div>
-
-          <div class="overview-top-list">
-            ${topHoldings
-              .map(
-                (holding) => `
-                  <div class="overview-top-item">
-                    <span class="overview-top-name">${holding.name}</span>
-                    <span class="overview-top-meta">${formatPercent(holding.assetWeight)} · ${formatCurrency(holding.marketValue)}</span>
-                  </div>
-                `,
-              )
-              .join("")}
           </div>
         </article>
       `;
@@ -806,21 +791,6 @@ function renderTableRows(portfolio) {
     .join("");
 }
 
-function renderFocusCards(portfolio) {
-  return getTopHoldings(portfolio)
-    .map(
-      (holding, index) => `
-        <article class="focus-card">
-          <p class="focus-label">상위 보유 ${index + 1}</p>
-          <h3 class="focus-name">${holding.name}</h3>
-          <p class="focus-meta">${formatCurrency(holding.marketValue)} · 총자산 ${formatPercent(holding.assetWeight)}</p>
-          <p class="focus-change ${getToneClass(holding.profitLoss)}">${formatSignedCurrency(holding.profitLoss)} / ${formatSignedPercent(holding.profitRate)}</p>
-        </article>
-      `,
-    )
-    .join("");
-}
-
 function renderPortfolioSection(portfolio) {
   return `
     <section class="account-stack" id="${portfolio.id}">
@@ -838,9 +808,6 @@ function renderPortfolioSection(portfolio) {
         </div>
         <div class="summary-grid">
           ${renderSummaryCards(portfolio)}
-        </div>
-        <div class="focus-strip">
-          ${renderFocusCards(portfolio)}
         </div>
       </section>
 
@@ -943,7 +910,7 @@ function renderApp(book) {
           <div>
             <h1 class="hero-title">절세계좌 포트폴리오</h1>
             <p class="hero-copy">
-              연금저축, 퇴직연금, ISA를 같은 기준으로 묶어 총자산, 손익, 현금, 핵심 보유 종목을 한 화면에서 점검할 수 있게 구성했습니다.
+              연금저축, 퇴직연금, ISA를 같은 기준으로 묶어 총자산, 손익, 현금, 계좌별 보유 현황을 한 화면에서 점검할 수 있게 구성했습니다.
               브라우저에서 외부 시세를 직접 확인하고, 응답이 없으면 저장된 최신 가격 파일을 폴백으로 사용합니다.
             </p>
           </div>
@@ -975,7 +942,7 @@ function renderApp(book) {
           <div>
             <h2 class="section-title">계좌 한눈에 보기</h2>
             <p class="section-copy">
-              각 계좌의 총자산, 손익, 현금, 핵심 보유 종목을 먼저 비교하고 필요한 계좌만 아래 상세 표로 내려가면 됩니다.
+              각 계좌의 총자산, 손익, 현금, 투자 비중을 먼저 비교하고 필요한 계좌만 아래 상세 표로 내려가면 됩니다.
             </p>
           </div>
         </div>
