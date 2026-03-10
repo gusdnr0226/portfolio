@@ -122,22 +122,25 @@ const SUPER_CATEGORY_RULES = {
 };
 const TREEMAP_SUPER_CATEGORY_ORDER = Object.keys(TREEMAP_LAYOUT_ORDER_BY_SUPER);
 const TREEMAP_CATEGORY_COLORS = {
-  "SCHD": "#77d7ff",
-  "S&P500": "#86abff",
-  Nasdaq: "#8e93ff",
-  "커버드콜": "#ff8ca1",
-  "부동산/리츠": "#5dd4c0",
-  "채권": "#77c8d2",
-  USD: "#ffd66b",
-  "배당ETF": "#8adc78",
-  "인프라": "#57d7ae",
-  "통신": "#68a8ff",
-  "제조": "#ffb067",
-  "금융": "#d7a0ff",
-  "원화": "#aab8d6",
-  MM: "#ffc887",
-  "기타": "#98a4c3",
+  "SCHD": "#6fa9d8",
+  "S&P500": "#7a8eea",
+  Nasdaq: "#5d73d6",
+  "커버드콜": "#b86f92",
+  "부동산/리츠": "#5ca893",
+  "채권": "#6f9fb3",
+  USD: "#b99b58",
+  "배당ETF": "#8ca56c",
+  "인프라": "#5f9b80",
+  "통신": "#5e81bc",
+  "제조": "#b98862",
+  "금융": "#8c88b9",
+  "원화": "#8e9ab4",
+  MM: "#b5a27b",
+  "기타": "#7a859d",
 };
+const TREEMAP_CANVAS_ASPECT_DESKTOP = 16 / 10;
+const TREEMAP_CANVAS_ASPECT_TABLET = 1.16;
+const TREEMAP_CANVAS_ASPECT_MOBILE = 1;
 
 const currencyFormatter = new Intl.NumberFormat("ko-KR");
 const compactCurrencyFormatter = new Intl.NumberFormat("ko-KR", {
@@ -177,6 +180,8 @@ const state = {
   refreshDetail: null,
   refreshTimerId: null,
 };
+let treemapTypographyFrameId = 0;
+let treemapResizeFrameId = 0;
 
 function normalizeTreemapToken(value) {
   return String(value ?? "")
@@ -273,6 +278,14 @@ function formatQuantity(value) {
 
 function formatPercent(value) {
   return `${percentFormatter.format(value * 100)}%`;
+}
+
+function formatTreemapAmount(value) {
+  return currencyFormatter.format(Math.round(value));
+}
+
+function formatTreemapCompactAmount(value) {
+  return compactCurrencyFormatter.format(Math.round(value));
 }
 
 function formatSignedPercent(value) {
@@ -995,28 +1008,352 @@ function buildTreemapData(book) {
   };
 }
 
-function findTreemapSplitIndex(items) {
+function getTreemapAssetLabel(asset) {
+  const ticker = String(asset.ticker ?? "").trim();
+
+  if (asset.type !== "현금" && /^[A-Z]{1,6}$/.test(ticker)) {
+    return ticker;
+  }
+
+  return asset.name;
+}
+
+function getTreemapNodeLabel(node) {
+  if (node?.assets || node?.categories) {
+    return node.name;
+  }
+
+  return getTreemapAssetLabel(node);
+}
+
+function getTreemapLabelUnits(label) {
+  return [...String(label ?? "")].reduce((sum, character) => {
+    if (/[가-힣]/.test(character)) {
+      return sum + 1;
+    }
+
+    if (/[A-Z]/.test(character)) {
+      return sum + 0.66;
+    }
+
+    if (/[a-z]/.test(character)) {
+      return sum + 0.58;
+    }
+
+    if (/[0-9]/.test(character)) {
+      return sum + 0.52;
+    }
+
+    return sum + 0.34;
+  }, 0);
+}
+
+function getTreemapGroupTextPenalty(items, rect) {
+  if (!items.length) {
+    return 0;
+  }
+
   const totalValue = items.reduce((sum, item) => sum + item.value, 0);
+  const weightedUnits = items.reduce((sum, item) => {
+    const labelUnits = getTreemapLabelUnits(getTreemapNodeLabel(item.node));
+    return sum + labelUnits * (item.value / totalValue);
+  }, 0);
+  const longestUnits = Math.max(
+    ...items.map((item) => getTreemapLabelUnits(getTreemapNodeLabel(item.node))),
+  );
+  const minSide = Math.min(rect.width, rect.height);
+  const desiredWidth = Math.min(30, 6 + longestUnits * 1.12);
+  const desiredShortSide = Math.min(20, 4.6 + weightedUnits * 0.46);
+
+  return (
+    Math.max(0, desiredWidth - rect.width) * 0.11 +
+    Math.max(0, desiredShortSide - minSide) * 0.18
+  );
+}
+
+function getTreemapCanvasAspectRatio() {
+  const viewportWidth = window.innerWidth || 1280;
+
+  if (viewportWidth <= 640) {
+    return TREEMAP_CANVAS_ASPECT_MOBILE;
+  }
+
+  if (viewportWidth <= 960) {
+    return TREEMAP_CANVAS_ASPECT_TABLET;
+  }
+
+  return TREEMAP_CANVAS_ASPECT_DESKTOP;
+}
+
+function getTreemapLayoutRect(width, height) {
+  return {
+    x: 0,
+    y: 0,
+    width,
+    height,
+  };
+}
+
+function encodeTreemapVariants(variants) {
+  return variants.map((variant) => encodeURIComponent(variant)).join("|");
+}
+
+function decodeTreemapVariants(value) {
+  return String(value ?? "")
+    .split("|")
+    .map((variant) => {
+      try {
+        return decodeURIComponent(variant);
+      } catch (error) {
+        return variant;
+      }
+    })
+    .filter(Boolean);
+}
+
+function doesTreemapTileCopyFit(tileInner, copy, value) {
+  const tileStyle = window.getComputedStyle(tileInner);
+  const paddingBlock =
+    Number.parseFloat(tileStyle.paddingTop) +
+    Number.parseFloat(tileStyle.paddingBottom);
+  const availableHeight = tileInner.clientHeight - paddingBlock - 1;
+  const copyRect = copy.getBoundingClientRect();
+  const heightFits = copyRect.height <= availableHeight;
+  const valueFits =
+    !value ||
+    value.offsetParent === null ||
+    value.scrollWidth <= value.clientWidth + 1;
+
+  return heightFits && valueFits;
+}
+
+function fitTreemapTileTypography(tileInner) {
+  const copy = tileInner.querySelector(".treemap-tile-copy");
+  const name = tileInner.querySelector(".treemap-tile-name");
+  const value = tileInner.querySelector(".treemap-tile-value");
+  const valueVariants = decodeTreemapVariants(value?.dataset.valueVariants).slice(
+    0,
+    4,
+  );
+
+  if (!copy || !name) {
+    return;
+  }
+
+  const applyScale = (scale) => {
+    tileInner.style.setProperty("--treemap-fit-scale", scale.toFixed(3));
+  };
+  const fullLabel = name.textContent ?? "";
+  const applyContent = (valueText = "") => {
+    name.textContent = fullLabel;
+
+    if (value) {
+      value.textContent = valueText;
+    }
+  };
+  const runBinaryFit = () => {
+    let low = 0.38;
+    let high = 1;
+
+    for (let iteration = 0; iteration < 10; iteration += 1) {
+      const mid = (low + high) / 2;
+      applyScale(mid);
+
+      if (doesTreemapTileCopyFit(tileInner, copy, value)) {
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+
+    applyScale(low);
+    return {
+      fits: doesTreemapTileCopyFit(tileInner, copy, value),
+      scale: low,
+    };
+  };
+  const tryVariant = (valueText, hideValue) => {
+    tileInner.classList.toggle("treemap-fit-compact", hideValue);
+    applyContent(valueText);
+    applyScale(1);
+
+    if (doesTreemapTileCopyFit(tileInner, copy, value)) {
+      return {
+        fits: true,
+        scale: 1,
+      };
+    }
+
+    return runBinaryFit();
+  };
+  const readableScaleThreshold = 0.68;
+  let bestFit = null;
+
+  valueVariants.forEach((valueText, valueIndex) => {
+    const result = tryVariant(valueText, false);
+
+    if (!result.fits) {
+      return;
+    }
+
+    if (result.scale >= readableScaleThreshold) {
+      bestFit = {
+        valueText,
+        hideValue: false,
+        scale: result.scale,
+      };
+      return;
+    }
+
+    if (
+      !bestFit ||
+      result.scale - valueIndex * 0.04 > bestFit.scale - (bestFit.hideValue ? 0.08 : 0)
+    ) {
+      bestFit = {
+        valueText,
+        hideValue: false,
+        scale: result.scale,
+      };
+    }
+  });
+
+  const compactResult = tryVariant("", true);
+
+  if (compactResult.fits) {
+    tileInner.classList.add("treemap-fit-compact");
+    applyContent("");
+    applyScale(compactResult.scale);
+    return;
+  }
+
+  const fallbackValue = valueVariants.at(-1) ?? value?.textContent ?? "";
+  const finalFit = bestFit ?? {
+    valueText: fallbackValue,
+    hideValue: true,
+    scale: 0.38,
+  };
+
+  tileInner.classList.toggle("treemap-fit-compact", finalFit.hideValue);
+  applyContent(finalFit.valueText);
+  applyScale(finalFit.scale);
+}
+
+function fitTreemapTypography() {
+  document.querySelectorAll(".treemap-tile-inner").forEach((tileInner) => {
+    fitTreemapTileTypography(tileInner);
+  });
+}
+
+function scheduleTreemapTypographyFit() {
+  if (treemapTypographyFrameId) {
+    window.cancelAnimationFrame(treemapTypographyFrameId);
+  }
+
+  treemapTypographyFrameId = window.requestAnimationFrame(() => {
+    treemapTypographyFrameId = 0;
+    fitTreemapTypography();
+  });
+}
+
+function getTreemapRectAspectRatio(rect) {
+  const shortSide = Math.max(Math.min(rect.width, rect.height), 1);
+  const longSide = Math.max(rect.width, rect.height);
+
+  return longSide / shortSide;
+}
+
+function getTreemapSplitPenalty(
+  rect,
+  firstRatio,
+  splitVertically,
+  firstItems,
+  secondItems,
+) {
+  const firstRect = splitVertically
+    ? {
+        width: rect.width * firstRatio,
+        height: rect.height,
+      }
+    : {
+        width: rect.width,
+        height: rect.height * firstRatio,
+      };
+  const secondRect = splitVertically
+    ? {
+        width: rect.width - firstRect.width,
+        height: rect.height,
+      }
+    : {
+        width: rect.width,
+        height: rect.height - firstRect.height,
+      };
+  const worstAspectRatio = Math.max(
+    getTreemapRectAspectRatio(firstRect),
+    getTreemapRectAspectRatio(secondRect),
+  );
+  const smallestSide = Math.min(
+    firstRect.width,
+    firstRect.height,
+    secondRect.width,
+    secondRect.height,
+  );
+  const textPenalty =
+    getTreemapGroupTextPenalty(firstItems, firstRect) +
+    getTreemapGroupTextPenalty(secondItems, secondRect);
+
+  return (
+    worstAspectRatio +
+    (smallestSide < 7 ? (7 - smallestSide) * 0.45 : 0) +
+    textPenalty
+  );
+}
+
+function findTreemapSplit(items, rect) {
+  const totalValue = items.reduce((sum, item) => sum + item.value, 0);
+  const preferredOrientationIsVertical = rect.width >= rect.height;
   let runningValue = 0;
-  let bestIndex = 1;
-  let bestDifference = Number.POSITIVE_INFINITY;
+  let bestSplit = {
+    index: 1,
+    splitVertically: preferredOrientationIsVertical,
+    score: Number.POSITIVE_INFINITY,
+  };
 
   for (let index = 1; index < items.length; index += 1) {
     runningValue += items[index - 1].value;
-    const difference = Math.abs(totalValue / 2 - runningValue);
+    const firstRatio = runningValue / totalValue;
+    const balancePenalty = Math.abs(0.5 - firstRatio) * 0.8;
 
-    if (difference < bestDifference) {
-      bestDifference = difference;
-      bestIndex = index;
-    }
+    [true, false].forEach((splitVertically) => {
+      const orientationPenalty =
+        splitVertically === preferredOrientationIsVertical ? 0 : 0.18;
+      const score =
+        getTreemapSplitPenalty(
+          rect,
+          firstRatio,
+          splitVertically,
+          items.slice(0, index),
+          items.slice(index),
+        ) +
+        balancePenalty +
+        orientationPenalty;
+
+      if (score < bestSplit.score) {
+        bestSplit = {
+          index,
+          splitVertically,
+          score,
+        };
+      }
+    });
   }
 
-  return bestIndex;
+  return bestSplit;
 }
 
 function buildTreemapLayouts(
   items,
   rect = { x: 0, y: 0, width: 100, height: 100 },
+  space = { width: rect.width, height: rect.height },
 ) {
   const filteredItems = items.filter((item) => item.value > 0);
 
@@ -1032,17 +1369,20 @@ function buildTreemapLayouts(
         y: rect.y,
         width: rect.width,
         height: rect.height,
+        spaceWidth: space.width,
+        spaceHeight: space.height,
       },
     ];
   }
 
   const totalValue = filteredItems.reduce((sum, item) => sum + item.value, 0);
-  const splitIndex = findTreemapSplitIndex(filteredItems);
+  const split = findTreemapSplit(filteredItems, rect);
+  const splitIndex = split.index;
   const firstItems = filteredItems.slice(0, splitIndex);
   const secondItems = filteredItems.slice(splitIndex);
   const firstValue = firstItems.reduce((sum, item) => sum + item.value, 0);
   const firstRatio = firstValue / totalValue;
-  const splitVertically = rect.width >= rect.height;
+  const { splitVertically } = split;
   const firstRect = splitVertically
     ? {
         x: rect.x,
@@ -1071,86 +1411,158 @@ function buildTreemapLayouts(
       };
 
   return [
-    ...buildTreemapLayouts(firstItems, firstRect),
-    ...buildTreemapLayouts(secondItems, secondRect),
+    ...buildTreemapLayouts(firstItems, firstRect, space),
+    ...buildTreemapLayouts(secondItems, secondRect, space),
   ];
 }
 
 function hexToRgba(hex, alpha) {
-  const normalizedHex = hex.replace("#", "");
-  const red = Number.parseInt(normalizedHex.slice(0, 2), 16);
-  const green = Number.parseInt(normalizedHex.slice(2, 4), 16);
-  const blue = Number.parseInt(normalizedHex.slice(4, 6), 16);
+  const { red, green, blue } = hexToRgb(hex);
 
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+function hexToRgb(hex) {
+  const normalizedHex = hex.replace("#", "");
+
+  return {
+    red: Number.parseInt(normalizedHex.slice(0, 2), 16),
+    green: Number.parseInt(normalizedHex.slice(2, 4), 16),
+    blue: Number.parseInt(normalizedHex.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex(red, green, blue) {
+  return `#${[red, green, blue]
+    .map((channel) => Math.max(0, Math.min(255, Math.round(channel))).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function mixHexColors(firstHex, secondHex, firstWeight = 0.5) {
+  const normalizedWeight = Math.max(0, Math.min(1, firstWeight));
+  const secondWeight = 1 - normalizedWeight;
+  const first = hexToRgb(firstHex);
+  const second = hexToRgb(secondHex);
+
+  return rgbToHex(
+    first.red * normalizedWeight + second.red * secondWeight,
+    first.green * normalizedWeight + second.green * secondWeight,
+    first.blue * normalizedWeight + second.blue * secondWeight,
+  );
 }
 
 function getTreemapAccent(category, superCategory) {
   return (
     TREEMAP_CATEGORY_COLORS[category] ??
-    (superCategory === "해외" ? "#62a8ff" : "#70d7a5")
+    (superCategory === "해외" ? "#7a97ca" : "#7da182")
   );
 }
 
 function buildTreemapStyle(layout, accent) {
+  const fill = mixHexColors(accent, "#d7dbe2", 0.56);
+  const fillSoft = mixHexColors(accent, "#e7eaee", 0.28);
+  const shell = mixHexColors(accent, "#ccd1d8", 0.12);
+  const spaceWidth = layout.spaceWidth ?? 100;
+  const spaceHeight = layout.spaceHeight ?? 100;
+
   return [
-    `left:${layout.x.toFixed(4)}%`,
-    `top:${layout.y.toFixed(4)}%`,
-    `width:${layout.width.toFixed(4)}%`,
-    `height:${layout.height.toFixed(4)}%`,
+    `left:${((layout.x / spaceWidth) * 100).toFixed(4)}%`,
+    `top:${((layout.y / spaceHeight) * 100).toFixed(4)}%`,
+    `width:${((layout.width / spaceWidth) * 100).toFixed(4)}%`,
+    `height:${((layout.height / spaceHeight) * 100).toFixed(4)}%`,
     `--treemap-accent:${accent}`,
-    `--treemap-accent-soft:${hexToRgba(accent, 0.13)}`,
-    `--treemap-accent-strong:${hexToRgba(accent, 0.24)}`,
-    `--treemap-outline:${hexToRgba(accent, 0.34)}`,
+    `--treemap-shell:${shell}`,
+    `--treemap-fill:${fill}`,
+    `--treemap-fill-soft:${fillSoft}`,
+    `--treemap-outline:${hexToRgba(accent, 0.18)}`,
+    `--treemap-text:#434957`,
+    `--treemap-text-soft:#656c7b`,
   ].join(";");
 }
 
 function getTreemapTileSizeClass(layout) {
   const area = layout.width * layout.height;
+  const minSide = Math.min(layout.width, layout.height);
+  const maxSide = Math.max(layout.width, layout.height);
+  const aspectRatio = maxSide / Math.max(minSide, 1);
+  const classes = [];
 
-  if (area >= 1400) {
-    return "tile-xl";
+  if (area >= 1500 && minSide >= 22) {
+    classes.push("tile-xl");
+  } else if (area >= 720 && minSide >= 16) {
+    classes.push("tile-lg");
+  } else if (area >= 260 && minSide >= 11) {
+    classes.push("tile-md");
+  } else if (area >= 120 && minSide >= 8) {
+    classes.push("tile-sm");
+  } else {
+    classes.push("tile-xs");
   }
 
-  if (area >= 650) {
-    return "tile-lg";
+  if (aspectRatio >= 3.2 || minSide < 9) {
+    classes.push("tile-tight");
   }
 
-  if (area >= 240) {
-    return "tile-md";
+  if (aspectRatio >= 5 || minSide < 6 || area < 60) {
+    classes.push("tile-micro");
   }
 
-  if (area >= 90) {
-    return "tile-sm";
+  return classes.join(" ");
+}
+
+function hasTreemapSizeClass(sizeClass, className) {
+  return sizeClass.split(/\s+/).includes(className);
+}
+
+function formatTreemapValueVariants(asset) {
+  return [
+    `${formatPercent(asset.weight)} / ${formatTreemapAmount(asset.marketValueBase)}`,
+    `${formatPercent(asset.weight)} / ${formatTreemapCompactAmount(asset.marketValueBase)}`,
+    formatTreemapCompactAmount(asset.marketValueBase),
+    formatPercent(asset.weight),
+  ];
+}
+
+function formatTreemapCategoryLabel(category, sizeClass) {
+  if (
+    hasTreemapSizeClass(sizeClass, "tile-tight") ||
+    hasTreemapSizeClass(sizeClass, "tile-micro") ||
+    hasTreemapSizeClass(sizeClass, "tile-xs")
+  ) {
+    return `${category.name} / ${formatPercent(category.weight)}`;
   }
 
-  return "tile-xs";
+  if (hasTreemapSizeClass(sizeClass, "tile-sm")) {
+    return `${category.name} / ${formatTreemapCompactAmount(category.marketValueBase)}`;
+  }
+
+  return `${category.name} / ${formatPercent(category.weight)} / ${formatTreemapAmount(category.marketValueBase)}`;
+}
+
+function formatTreemapSuperLabel(superCategory, sizeClass) {
+  if (
+    hasTreemapSizeClass(sizeClass, "tile-tight") ||
+    hasTreemapSizeClass(sizeClass, "tile-xs")
+  ) {
+    return `${superCategory.name} / ${formatPercent(superCategory.weight)}`;
+  }
+
+  return `${superCategory.name} / ${formatPercent(superCategory.weight)} / ${formatTreemapAmount(superCategory.marketValueBase)}`;
 }
 
 function renderTreemapAssetTile(layout) {
   const asset = layout.node;
   const sizeClass = getTreemapTileSizeClass(layout);
   const accent = getTreemapAccent(asset.category, asset.superCategory);
-  const positionType =
-    asset.type === "현금"
-      ? asset.accountCount > 1
-        ? `${asset.accountCount}계좌 현금 합산`
-        : "현금"
-      : asset.accountCount > 1
-        ? `${asset.accountCount}계좌 합산`
-        : asset.type;
+  const label = getTreemapAssetLabel(asset);
+  const valueVariants = formatTreemapValueVariants(asset);
 
   return `
     <article class="treemap-tile ${sizeClass}" style="${buildTreemapStyle(layout, accent)}">
       <div class="treemap-tile-inner">
-        <div class="treemap-tile-head">
-          <strong class="treemap-tile-name">${asset.name}</strong>
-          ${asset.currency !== "KRW" ? `<span class="treemap-tile-badge">${asset.currency}</span>` : ""}
-        </div>
-        <div class="treemap-tile-body">
-          <span class="treemap-tile-value">${formatCompactCurrency(asset.marketValueBase)}</span>
-          <span class="treemap-tile-meta">${formatPercent(asset.weight)}</span>
-          <span class="treemap-tile-meta">${positionType}</span>
+        <div class="treemap-tile-copy">
+          <strong class="treemap-tile-name">${label}</strong>
+          <span class="treemap-tile-value" data-value-variants="${encodeTreemapVariants(valueVariants)}">${valueVariants[0]}</span>
         </div>
       </div>
     </article>
@@ -1166,13 +1578,13 @@ function renderTreemapCategoryTile(layout) {
       node: asset,
       value: asset.marketValueBase,
     })),
+    getTreemapLayoutRect(layout.width, layout.height),
   );
 
   return `
     <article class="treemap-category ${sizeClass}" style="${buildTreemapStyle(layout, accent)}">
       <div class="treemap-category-head">
-        <strong>${category.name}</strong>
-        <span>${formatCompactCurrency(category.marketValueBase)} · ${formatPercent(category.weight)}</span>
+        <p class="treemap-category-label">${formatTreemapCategoryLabel(category, sizeClass)}</p>
       </div>
       <div class="treemap-category-body">
         ${assetLayouts.map(renderTreemapAssetTile).join("")}
@@ -1190,16 +1602,13 @@ function renderTreemapSuperCategoryTile(layout) {
       node: category,
       value: category.marketValueBase,
     })),
+    getTreemapLayoutRect(layout.width, layout.height),
   );
 
   return `
     <section class="treemap-super ${sizeClass}" style="${buildTreemapStyle(layout, accent)}">
       <div class="treemap-super-head">
-        <div>
-          <p class="treemap-super-label">${superCategory.name}</p>
-          <strong class="treemap-super-value">${formatCompactCurrency(superCategory.marketValueBase)}</strong>
-        </div>
-        <span class="treemap-super-share">${formatPercent(superCategory.weight)}</span>
+        <p class="treemap-super-label">${formatTreemapSuperLabel(superCategory, sizeClass)}</p>
       </div>
       <div class="treemap-super-body">
         ${categoryLayouts.map(renderTreemapCategoryTile).join("")}
@@ -1220,6 +1629,7 @@ function renderTreemapSection(book) {
       node: superCategory,
       value: superCategory.marketValueBase,
     })),
+    getTreemapLayoutRect(getTreemapCanvasAspectRatio() * 100, 100),
   );
 
   return `
@@ -1302,6 +1712,8 @@ function getPriceSourceLabel(priceSource) {
       return "자동 시세";
     case "stored":
       return "저장 시세";
+    case "mixed":
+      return "혼합 시세";
     case "manual":
       return "수동 가격";
     default:
@@ -1315,6 +1727,8 @@ function getPriceSourceDetail(priceSource) {
       return "외부 시세 직접 반영";
     case "stored":
       return "최근 저장 시세 반영";
+    case "mixed":
+      return "계좌별 시세 기준 혼합";
     case "manual":
       return "수동 기준 가격";
     default:
@@ -1449,37 +1863,119 @@ function renderAccountOverviewCards(book) {
     .join("");
 }
 
-function renderAccountComparisonRows(book) {
-  return book.portfolios
-    .map((portfolio) => {
-      const primaryHolding = getTopHoldings(portfolio, 1)[0];
+function getAggregatePriceSource(priceSources) {
+  const uniqueSources = [...new Set(priceSources.filter(Boolean))];
 
-      return `
+  if (!uniqueSources.length) {
+    return "snapshot";
+  }
+
+  if (uniqueSources.length === 1) {
+    return uniqueSources[0];
+  }
+
+  return "mixed";
+}
+
+function buildAggregatedHoldings(book) {
+  const aggregatedHoldings = new Map();
+
+  book.portfolios.forEach((portfolio) => {
+    portfolio.holdings.forEach((holding) => {
+      const key = `${holding.currency}:${holding.ticker}`;
+      const existingHolding = aggregatedHoldings.get(key) ?? {
+        ticker: holding.ticker,
+        name: holding.name,
+        type: holding.type,
+        currency: holding.currency,
+        quantity: 0,
+        marketValue: 0,
+        marketValueBase: 0,
+        costBasis: 0,
+        costBasisBase: 0,
+        profitLoss: 0,
+        profitLossBase: 0,
+        accountNames: new Set(),
+        priceSources: [],
+        nameInferred: false,
+      };
+
+      existingHolding.quantity += holding.quantity;
+      existingHolding.marketValue += holding.marketValue;
+      existingHolding.marketValueBase += holding.marketValueBase;
+      existingHolding.costBasis += holding.costBasis;
+      existingHolding.costBasisBase += holding.costBasisBase;
+      existingHolding.profitLoss += holding.profitLoss;
+      existingHolding.profitLossBase += holding.profitLossBase;
+      existingHolding.accountNames.add(portfolio.name);
+      existingHolding.priceSources.push(holding.priceSource);
+      existingHolding.nameInferred ||= holding.nameInferred;
+
+      aggregatedHoldings.set(key, existingHolding);
+    });
+  });
+
+  return [...aggregatedHoldings.values()]
+    .map((holding) => ({
+      ...holding,
+      accountNames: [...holding.accountNames],
+      accountCount: holding.accountNames.size,
+      currentPrice: holding.quantity === 0 ? 0 : holding.marketValue / holding.quantity,
+      averageCost: holding.quantity === 0 ? 0 : holding.costBasis / holding.quantity,
+      profitRate: holding.costBasis === 0 ? 0 : holding.profitLoss / holding.costBasis,
+      assetWeight:
+        book.overview.totalAssets === 0 ? 0 : holding.marketValueBase / book.overview.totalAssets,
+      priceSource: getAggregatePriceSource(holding.priceSources),
+    }))
+    .sort(
+      (left, right) =>
+        right.marketValueBase - left.marketValueBase ||
+        left.name.localeCompare(right.name, "ko-KR"),
+    );
+}
+
+function formatAggregatedHoldingNote(holding) {
+  if (holding.accountCount <= 1) {
+    return "-";
+  }
+
+  return `${holding.accountNames.join(", ")} 합산`;
+}
+
+function renderAllHoldingsRows(book) {
+  return buildAggregatedHoldings(book)
+    .map(
+      (holding) => `
         <tr>
           <td>
-            <a class="comparison-account" href="#${portfolio.id}">
-              <strong>${portfolio.name}</strong>
-              <span>${portfolio.snapshotLabel}</span>
-            </a>
+            <div class="asset-name">${holding.name}</div>
+            <div class="asset-meta">
+              <span class="tag">${holding.type}</span>
+              <span class="tag">${holding.ticker}</span>
+              ${holding.currency !== "KRW" ? `<span class="tag">${holding.currency}</span>` : ""}
+              <span class="tag ${holding.priceSource === "snapshot" || holding.priceSource === "manual" ? "tag-warning" : "tag-live"}">
+                ${getPriceSourceLabel(holding.priceSource)}
+              </span>
+              ${holding.nameInferred ? '<span class="tag tag-warning">이름 추정</span>' : ""}
+            </div>
           </td>
-          <td>${formatCurrency(portfolio.totals.totalAssets)}</td>
-          <td class="${getToneClass(portfolio.totals.profitLoss)}">${formatSignedCurrency(portfolio.totals.profitLoss)}</td>
-          <td class="${getToneClass(portfolio.totals.totalReturn)}">${formatSignedPercent(portfolio.totals.totalReturn)}</td>
-          <td>${formatCurrency(portfolio.cash)}</td>
-          <td>${formatPercent(portfolio.totals.investedWeight)}</td>
+          <td>${formatQuantity(holding.quantity)}</td>
           <td>
-            ${primaryHolding
-              ? `
-                <div class="comparison-primary">
-                  <strong>${primaryHolding.name}</strong>
-                  <span>총자산 ${formatPercent(primaryHolding.assetWeight)}</span>
-                </div>
-              `
-              : "-"}
+            <div class="metric">
+              <strong>${formatPrice(holding.currentPrice, holding.currency)}</strong>
+              <span>${getPriceSourceDetail(holding.priceSource)}</span>
+            </div>
           </td>
+          <td>${formatAverageCost(holding.averageCost, holding.currency)}</td>
+          <td>${formatMoney(holding.costBasis, holding.currency)}</td>
+          <td>${formatMoney(holding.marketValue, holding.currency)}</td>
+          <td class="${getToneClass(holding.profitLoss)}">${formatSignedMoney(holding.profitLoss, holding.currency)}</td>
+          <td class="${getToneClass(holding.profitRate)}">${formatSignedPercent(holding.profitRate)}</td>
+          <td>${formatPercent(holding.assetWeight)}</td>
+          <td>${formatAggregatedHoldingNote(holding)}</td>
         </tr>
-      `;
-    })
+      `,
+    )
     .join("");
 }
 
@@ -1516,6 +2012,60 @@ function renderTableRows(portfolio) {
       `,
     )
     .join("");
+}
+
+function renderAllHoldingsSection(book) {
+  const uniqueHoldingsCount = buildAggregatedHoldings(book).length;
+
+  return `
+    <section class="table-card all-holdings-card">
+      <div class="section-head">
+        <div>
+          <h2 class="section-title">종목별 전체 합산 표</h2>
+          <p class="section-copy">
+            같은 종목을 여러 계좌에서 보유 중이면 한 줄로 합산했습니다. 수량, 매입금액, 평가금액, 손익은 종목 기준으로 합치고, 여러 계좌 보유 여부는 비고에서 확인할 수 있습니다.
+          </p>
+        </div>
+        <div class="section-pill">중복 합산 후 ${currencyFormatter.format(uniqueHoldingsCount)}종목</div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="all-holdings-table">
+          <thead>
+            <tr>
+              <th>종목</th>
+              <th>수량</th>
+              <th>현재가</th>
+              <th>평균단가</th>
+              <th>매입금액</th>
+              <th>평가금액</th>
+              <th>평가손익</th>
+              <th>수익률</th>
+              <th>전체 비중</th>
+              <th>비고</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${renderAllHoldingsRows(book)}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>합계 (원화 환산)</td>
+              <td>-</td>
+              <td>-</td>
+              <td>-</td>
+              <td>${formatCurrency(book.overview.costBasis)}</td>
+              <td>${formatCurrency(book.overview.marketValue)}</td>
+              <td class="${getToneClass(book.overview.profitLoss)}">${formatSignedCurrency(book.overview.profitLoss)}</td>
+              <td class="${getToneClass(book.overview.totalReturn)}">${formatSignedPercent(book.overview.totalReturn)}</td>
+              <td>${formatPercent(book.overview.totalAssets === 0 ? 0 : book.overview.marketValue / book.overview.totalAssets)}</td>
+              <td>현금 제외 보유 종목 합산</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+  `;
 }
 
 function renderPortfolioSection(portfolio) {
@@ -1672,47 +2222,21 @@ function renderApp(book) {
           <div>
             <h2 class="section-title">계좌 한눈에 보기</h2>
             <p class="section-copy">
-              전체 종목 트리맵으로 비중을 먼저 보고, 각 계좌의 총자산, 손익, 현금, 투자 비중은 아래 카드와 비교표에서 이어서 확인하면 됩니다.
+              전체 종목 트리맵으로 비중을 먼저 보고, 각 계좌의 총자산, 손익, 현금, 투자 비중은 아래 카드에서 바로 이어서 확인하면 됩니다.
             </p>
           </div>
         </div>
 
         ${renderTreemapSection(book)}
 
-        <div class="overview-layout">
+        <div class="overview-layout overview-layout-full">
           <div class="overview-grid">
             ${renderAccountOverviewCards(book)}
           </div>
-
-          <section class="comparison-card">
-            <div class="section-head comparison-head">
-              <div>
-                <h3 class="section-title">계좌 비교표</h3>
-                <p class="section-copy">총자산, 평가손익, 수익률, 투자 비중을 같은 행으로 비교합니다.</p>
-              </div>
-            </div>
-
-            <div class="comparison-table-wrap">
-              <table class="comparison-table">
-                <thead>
-                  <tr>
-                    <th>계좌</th>
-                    <th>총자산</th>
-                    <th>평가손익</th>
-                    <th>수익률</th>
-                    <th>현금</th>
-                    <th>주식 비중</th>
-                    <th>상위 보유</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${renderAccountComparisonRows(book)}
-                </tbody>
-              </table>
-            </div>
-          </section>
         </div>
       </section>
+
+      ${renderAllHoldingsSection(book)}
 
       <section class="detail-section">
         <div class="section-head detail-head">
@@ -1730,6 +2254,14 @@ function renderApp(book) {
       </section>
     </section>
   `;
+
+  scheduleTreemapTypographyFit();
+
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(() => {
+      scheduleTreemapTypographyFit();
+    });
+  }
 }
 
 async function refreshLivePrices() {
@@ -1807,6 +2339,22 @@ document.addEventListener("click", (event) => {
   }
 
   refreshLivePrices();
+});
+
+window.addEventListener("resize", () => {
+  if (treemapResizeFrameId) {
+    window.cancelAnimationFrame(treemapResizeFrameId);
+  }
+
+  treemapResizeFrameId = window.requestAnimationFrame(() => {
+    treemapResizeFrameId = 0;
+
+    if (!state.portfolioSource) {
+      return;
+    }
+
+    renderCurrentBook();
+  });
 });
 
 initializeApp();
