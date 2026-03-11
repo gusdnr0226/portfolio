@@ -886,34 +886,58 @@ body::before {
 
 .portfolio-circle-summary {
   position: absolute;
-  display: grid;
-  place-items: center;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 4px;
   width: min(54%, 138px);
+  max-width: 138px;
+  min-height: 72px;
   padding: 0;
   text-align: center;
   pointer-events: none;
 }
 
 .portfolio-circle-summary strong {
+  display: block;
+  width: 100%;
   font-size: clamp(0.92rem, 0.5vw + 0.84rem, 1.12rem);
   line-height: 1.25;
   letter-spacing: -0.02em;
 }
 
+.portfolio-circle-summary.is-single-line {
+  gap: 0;
+}
+
+.portfolio-circle-summary.is-single-line strong {
+  line-height: 1.15;
+}
+
 .portfolio-circle-summary-meta {
-  display: grid;
-  justify-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 2px;
+  width: 100%;
   font-size: 0.76rem;
   line-height: 1.2;
 }
 
 .portfolio-circle-summary-meta span {
+  display: block;
+  width: 100%;
   white-space: nowrap;
 }
 
 .portfolio-circle-summary-note {
+  display: block;
+  width: 100%;
   color: var(--muted);
   font-size: 0.72rem;
   line-height: 1.2;
@@ -1439,6 +1463,7 @@ tfoot td {
 
   .portfolio-circle-summary {
     width: min(60%, 126px);
+    max-width: 126px;
   }
 
   .portfolio-circle-table-head,

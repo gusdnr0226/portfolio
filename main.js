@@ -383,6 +383,14 @@ function formatSignedPercent(value) {
   return `${prefix}${percentFormatter.format(value * 100)}%`;
 }
 
+function formatProfitWithRate(profitLoss, costBasis) {
+  if (costBasis <= 0) {
+    return formatSignedCurrency(profitLoss);
+  }
+
+  return `${formatSignedCurrency(profitLoss)} (${formatSignedPercent(profitLoss / costBasis)})`;
+}
+
 function formatCashBreakdown(cashKrw, cashUsd) {
   const parts = [];
 
@@ -2280,6 +2288,10 @@ function renderPortfolioCirclePlot({
   summaryMeta = "",
   summaryNote = "",
 }) {
+  const summaryClassName = `portfolio-circle-summary${
+    summaryMeta || summaryNote ? "" : " is-single-line"
+  }`;
+
   return `
     <section class="portfolio-circle-block">
       <p class="portfolio-circle-block-title">${title}</p>
@@ -2304,7 +2316,7 @@ function renderPortfolioCirclePlot({
             )
             .join("")}
         </svg>
-        <div class="portfolio-circle-summary">
+        <div class="${summaryClassName}">
           <strong>${summaryValue}</strong>
           ${summaryMeta ? `<div class="portfolio-circle-summary-meta">${summaryMeta}</div>` : ""}
           ${summaryNote ? `<div class="portfolio-circle-summary-note">${summaryNote}</div>` : ""}
@@ -2352,10 +2364,6 @@ function renderPortfolioCircleChart(treemap) {
             chartLabel: `포트폴리오 평가금액 원형 차트: ${valueChartAriaLabel}`,
             segments,
             summaryValue: formatCurrency(treemap.totalAssets),
-            summaryMeta: `
-              <span class="${getToneClass(totalProfitLoss)}">${formatSignedCurrency(totalProfitLoss)}</span>
-              <span class="${getToneClass(totalReturn)}">${formatSignedPercent(totalReturn)}</span>
-            `,
           })}
           ${renderPortfolioCirclePlot({
             title: "Dividend",
@@ -2392,7 +2400,7 @@ function renderPortfolioCircleChart(treemap) {
                       </div>
                       <div class="portfolio-circle-cell portfolio-circle-profit">
                         <strong>${formatCurrency(group.costBasisBase)}</strong>
-                        <span class="${getToneClass(group.profitLossBase)}">${formatSignedCurrency(group.profitLossBase)}</span>
+                        <span class="${getToneClass(group.profitLossBase)}">${formatProfitWithRate(group.profitLossBase, group.costBasisBase)}</span>
                       </div>
                       <div class="portfolio-circle-cell portfolio-circle-weight">
                         <strong>${formatPercent(group.weight)}</strong>
@@ -2412,7 +2420,7 @@ function renderPortfolioCircleChart(treemap) {
               </div>
               <div class="portfolio-circle-cell portfolio-circle-profit">
                 <strong>${formatCurrency(totalCostBasis)}</strong>
-                <span class="${getToneClass(totalProfitLoss)}">${formatSignedCurrency(totalProfitLoss)}</span>
+                <span class="${getToneClass(totalProfitLoss)}">${formatProfitWithRate(totalProfitLoss, totalCostBasis)}</span>
               </div>
               <div class="portfolio-circle-cell portfolio-circle-weight">
                 <strong>${formatPercent(1)}</strong>
