@@ -188,6 +188,7 @@ const PORTFOLIO_CIRCLE_GROUPS = [
     memberOrder: ["원화", "USD", "MM"],
   },
 ];
+const PORTFOLIO_DIVIDEND_YIELD_ASSUMPTION = 0.05;
 const TREEMAP_CANVAS_ASPECT_DESKTOP = 16 / 10;
 const TREEMAP_CANVAS_ASPECT_TABLET = 1.16;
 const TREEMAP_CANVAS_ASPECT_MOBILE = 1;
@@ -220,6 +221,10 @@ const usdWholeCurrencyFormatter = new Intl.NumberFormat("en-US", {
 const percentFormatter = new Intl.NumberFormat("ko-KR", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
+});
+const weightPercentFormatter = new Intl.NumberFormat("ko-KR", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
 });
 const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
   dateStyle: "medium",
@@ -358,7 +363,11 @@ function formatQuantity(value) {
 }
 
 function formatPercent(value) {
-  return `${percentFormatter.format(value * 100)}%`;
+  return `${weightPercentFormatter.format(value * 100)}%`;
+}
+
+function formatTreemapPercent(value) {
+  return `${weightPercentFormatter.format(value * 100)}%`;
 }
 
 function formatTreemapAmount(value) {
@@ -1247,6 +1256,10 @@ function encodeTreemapVariants(variants) {
   return variants.map((variant) => encodeURIComponent(variant)).join("|");
 }
 
+function encodeTreemapHoverValue(value) {
+  return encodeURIComponent(String(value ?? ""));
+}
+
 function decodeTreemapVariants(value) {
   return String(value ?? "")
     .split("|")
@@ -1258,6 +1271,14 @@ function decodeTreemapVariants(value) {
       }
     })
     .filter(Boolean);
+}
+
+function decodeTreemapHoverValue(value) {
+  try {
+    return decodeURIComponent(String(value ?? ""));
+  } catch (error) {
+    return String(value ?? "");
+  }
 }
 
 function doesTreemapTileCopyFit(tileInner, copy, value) {
@@ -1365,6 +1386,13 @@ function fitTreemapTileTypography(tileInner) {
       };
     }
   });
+
+  if (bestFit) {
+    tileInner.classList.toggle("treemap-fit-compact", bestFit.hideValue);
+    applyContent(bestFit.valueText);
+    applyScale(bestFit.scale);
+    return;
+  }
 
   const compactResult = tryVariant("", true);
 
@@ -1664,12 +1692,7 @@ function hasTreemapSizeClass(sizeClass, className) {
 }
 
 function formatTreemapValueVariants(asset) {
-  return [
-    `${formatPercent(asset.weight)} / ${formatTreemapAmount(asset.marketValueBase)}`,
-    `${formatPercent(asset.weight)} / ${formatTreemapCompactAmount(asset.marketValueBase)}`,
-    formatTreemapCompactAmount(asset.marketValueBase),
-    formatPercent(asset.weight),
-  ];
+  return [formatTreemapPercent(asset.weight)];
 }
 
 function formatTreemapCategoryLabel(category, sizeClass) {
@@ -1705,9 +1728,19 @@ function renderTreemapAssetTile(layout) {
   const accent = getTreemapAccent(asset.category, asset.superCategory);
   const label = getTreemapAssetLabel(asset);
   const valueVariants = formatTreemapValueVariants(asset);
+  const hoverName = encodeTreemapHoverValue(asset.name);
+  const hoverValue = encodeTreemapHoverValue(formatCurrency(asset.marketValueBase));
+  const hoverWeight = encodeTreemapHoverValue(formatTreemapPercent(asset.weight));
 
   return `
-    <article class="treemap-tile ${sizeClass}" style="${buildTreemapStyle(layout, accent)}">
+    <article
+      class="treemap-tile ${sizeClass}"
+      style="${buildTreemapStyle(layout, accent)}"
+      data-treemap-hover="asset"
+      data-treemap-name="${hoverName}"
+      data-treemap-value="${hoverValue}"
+      data-treemap-weight="${hoverWeight}"
+    >
       <div class="treemap-tile-inner">
         <div class="treemap-tile-copy">
           <strong class="treemap-tile-name">${label}</strong>
@@ -1794,6 +1827,13 @@ function renderTreemapSection(book) {
       <div class="treemap-wrap">
         <div class="treemap-canvas">
           ${superCategoryLayouts.map(renderTreemapSuperCategoryTile).join("")}
+        </div>
+        <div class="treemap-hover-card" aria-hidden="true">
+          <strong class="treemap-hover-title"></strong>
+          <div class="treemap-hover-meta">
+            <span class="treemap-hover-value"></span>
+            <span class="treemap-hover-weight"></span>
+          </div>
         </div>
       </div>
 
@@ -2136,6 +2176,7 @@ function buildPortfolioCircleGroups(treemap) {
         ...group,
         marketValueBase: 0,
         costBasisBase: 0,
+        dividendIncomeBase: 0,
         profitLossBase: 0,
         members: new Set(),
         assetMap: new Map(),
@@ -2154,6 +2195,7 @@ function buildPortfolioCircleGroups(treemap) {
 
       group.marketValueBase += category.marketValueBase;
       group.costBasisBase += category.costBasisBase;
+      group.dividendIncomeBase += category.marketValueBase * PORTFOLIO_DIVIDEND_YIELD_ASSUMPTION;
       group.profitLossBase += category.profitLossBase;
       group.members.add(category.name);
 
@@ -2186,11 +2228,20 @@ function buildPortfolioCircleGroups(treemap) {
         )
         .slice(0, 2)
         .map((asset) => asset.name);
+      let detail = topAssets.join(", ");
+
+      if (resolvedGroup.key === "국내 주식/ETF") {
+        detail = "배당ETF, 인프라/통신/금융 등";
+      }
+
+      if (resolvedGroup.key === "현금성자산") {
+        detail = "MM, USD, KRW";
+      }
 
       return {
         ...resolvedGroup,
         members,
-        detail: topAssets.join(", "),
+        detail,
         dividendWeightText: "-",
         weight:
           treemap.totalAssets === 0 ? 0 : resolvedGroup.marketValueBase / treemap.totalAssets,
@@ -2205,7 +2256,8 @@ function buildPortfolioCircleSegments(groups) {
   let offset = 0;
 
   return groups.map((group) => {
-    const segmentLength = circumference * group.weight;
+    const segmentWeight = group.chartWeight ?? group.weight;
+    const segmentLength = circumference * segmentWeight;
     const gapLength = Math.min(circumference * 0.008, segmentLength * 0.3);
     const visibleLength = Math.max(segmentLength - gapLength, 0);
     const segment = {
@@ -2218,6 +2270,48 @@ function buildPortfolioCircleSegments(groups) {
     offset += segmentLength;
     return segment;
   });
+}
+
+function renderPortfolioCirclePlot({
+  title,
+  chartLabel,
+  segments,
+  summaryValue,
+  summaryMeta = "",
+  summaryNote = "",
+}) {
+  return `
+    <section class="portfolio-circle-block">
+      <p class="portfolio-circle-block-title">${title}</p>
+      <div class="portfolio-circle-plot">
+        <svg class="portfolio-circle-svg" viewBox="0 0 120 120" role="img" aria-label="${chartLabel}">
+          <circle class="portfolio-circle-track" cx="60" cy="60" r="36" fill="none"></circle>
+          ${segments
+            .map(
+              (segment) => `
+                <circle
+                  class="portfolio-circle-segment"
+                  data-circle-group="${segment.key}"
+                  cx="60"
+                  cy="60"
+                  r="${segment.radius}"
+                  fill="none"
+                  stroke="${segment.color}"
+                  stroke-dasharray="${segment.dasharray}"
+                  stroke-dashoffset="${segment.dashoffset}"
+                ></circle>
+              `,
+            )
+            .join("")}
+        </svg>
+        <div class="portfolio-circle-summary">
+          <strong>${summaryValue}</strong>
+          ${summaryMeta ? `<div class="portfolio-circle-summary-meta">${summaryMeta}</div>` : ""}
+          ${summaryNote ? `<div class="portfolio-circle-summary-note">${summaryNote}</div>` : ""}
+        </div>
+      </div>
+    </section>
+  `;
 }
 
 function renderPortfolioCircleChart(treemap) {
@@ -2234,45 +2328,42 @@ function renderPortfolioCircleChart(treemap) {
   );
   const segments = buildPortfolioCircleSegments(sortedGroups);
   const totalCostBasis = sortedGroups.reduce((sum, group) => sum + group.costBasisBase, 0);
+  const totalDividendIncome = sortedGroups.reduce((sum, group) => sum + group.dividendIncomeBase, 0);
   const totalProfitLoss = sortedGroups.reduce((sum, group) => sum + group.profitLossBase, 0);
   const totalReturn = totalCostBasis === 0 ? 0 : totalProfitLoss / totalCostBasis;
-  const chartAriaLabel = sortedGroups
+  const valueChartAriaLabel = sortedGroups
     .map((group) => `${group.label} ${formatPercent(group.weight)}`)
+    .join(", ");
+  const dividendGroups = sortedGroups.map((group) => ({
+    ...group,
+    chartWeight: totalDividendIncome === 0 ? 0 : group.dividendIncomeBase / totalDividendIncome,
+  }));
+  const dividendSegments = buildPortfolioCircleSegments(dividendGroups);
+  const dividendChartAriaLabel = dividendGroups
+    .map((group) => `${group.label} ${formatPercent(group.chartWeight)}`)
     .join(", ");
 
   return `
     <article class="portfolio-circle-card">
       <div class="portfolio-circle-layout">
         <div class="portfolio-circle-visual">
-          <div class="portfolio-circle-plot">
-            <svg class="portfolio-circle-svg" viewBox="0 0 120 120" role="img" aria-label="포트폴리오 원형 차트: ${chartAriaLabel}">
-              <circle class="portfolio-circle-track" cx="60" cy="60" r="36" fill="none"></circle>
-              ${segments
-                .map(
-                  (segment) => `
-                    <circle
-                      class="portfolio-circle-segment"
-                      data-circle-group="${segment.key}"
-                      cx="60"
-                      cy="60"
-                      r="${segment.radius}"
-                      fill="none"
-                      stroke="${segment.color}"
-                      stroke-dasharray="${segment.dasharray}"
-                      stroke-dashoffset="${segment.dashoffset}"
-                    ></circle>
-                  `,
-                )
-                .join("")}
-            </svg>
-            <div class="portfolio-circle-summary">
-              <strong>${formatCurrency(treemap.totalAssets)}</strong>
-              <div class="portfolio-circle-summary-meta">
-                <span class="${getToneClass(totalProfitLoss)}">${formatSignedCurrency(totalProfitLoss)}</span>
-                <span class="${getToneClass(totalReturn)}">${formatSignedPercent(totalReturn)}</span>
-              </div>
-            </div>
-          </div>
+          ${renderPortfolioCirclePlot({
+            title: "Value",
+            chartLabel: `포트폴리오 평가금액 원형 차트: ${valueChartAriaLabel}`,
+            segments,
+            summaryValue: formatCurrency(treemap.totalAssets),
+            summaryMeta: `
+              <span class="${getToneClass(totalProfitLoss)}">${formatSignedCurrency(totalProfitLoss)}</span>
+              <span class="${getToneClass(totalReturn)}">${formatSignedPercent(totalReturn)}</span>
+            `,
+          })}
+          ${renderPortfolioCirclePlot({
+            title: "Dividend",
+            chartLabel: `포트폴리오 연간 배당 원형 차트: ${dividendChartAriaLabel}`,
+            segments: dividendSegments,
+            summaryValue: formatCurrency(totalDividendIncome),
+            summaryNote: `연 ${formatPercent(PORTFOLIO_DIVIDEND_YIELD_ASSUMPTION)} 가정`,
+          })}
         </div>
 
         <div class="portfolio-circle-side">
@@ -2324,7 +2415,7 @@ function renderPortfolioCircleChart(treemap) {
                 <span class="${getToneClass(totalProfitLoss)}">${formatSignedCurrency(totalProfitLoss)}</span>
               </div>
               <div class="portfolio-circle-cell portfolio-circle-weight">
-                <strong>100.00%</strong>
+                <strong>${formatPercent(1)}</strong>
               </div>
             </div>
           </div>
@@ -2361,6 +2452,71 @@ function hydratePortfolioCircleInteractions() {
       });
       element.addEventListener("mouseleave", () => {
         setPortfolioCircleActiveGroup(card, "");
+      });
+    });
+  });
+}
+
+function setTreemapHoverPosition(card, tooltip, event) {
+  const wrap = card.querySelector(".treemap-wrap");
+
+  if (!wrap) {
+    return;
+  }
+
+  const wrapRect = wrap.getBoundingClientRect();
+  const tooltipRect = tooltip.getBoundingClientRect();
+  let left = event.clientX - wrapRect.left + 16;
+  let top = event.clientY - wrapRect.top + 16;
+
+  left = Math.max(12, Math.min(left, wrapRect.width - tooltipRect.width - 12));
+  top = Math.max(12, Math.min(top, wrapRect.height - tooltipRect.height - 12));
+
+  tooltip.style.transform = `translate(${left}px, ${top}px)`;
+}
+
+function hydrateTreemapInteractions() {
+  document.querySelectorAll(".treemap-card").forEach((card) => {
+    const tooltip = card.querySelector(".treemap-hover-card");
+
+    if (!tooltip) {
+      return;
+    }
+
+    const title = tooltip.querySelector(".treemap-hover-title");
+    const value = tooltip.querySelector(".treemap-hover-value");
+    const weight = tooltip.querySelector(".treemap-hover-weight");
+    const clearActive = () => {
+      card.querySelectorAll(".treemap-tile.is-hovered").forEach((tile) => {
+        tile.classList.remove("is-hovered");
+      });
+      tooltip.classList.remove("is-visible");
+    };
+
+    card.querySelectorAll("[data-treemap-hover]").forEach((tile) => {
+      if (tile.dataset.treemapBound === "true") {
+        return;
+      }
+
+      tile.dataset.treemapBound = "true";
+      tile.addEventListener("mouseenter", (event) => {
+        title.textContent = decodeTreemapHoverValue(tile.dataset.treemapName);
+        value.textContent = decodeTreemapHoverValue(tile.dataset.treemapValue);
+        weight.textContent = decodeTreemapHoverValue(tile.dataset.treemapWeight);
+        clearActive();
+        tile.classList.add("is-hovered");
+        tooltip.classList.add("is-visible");
+        setTreemapHoverPosition(card, tooltip, event);
+      });
+      tile.addEventListener("mousemove", (event) => {
+        if (!tooltip.classList.contains("is-visible")) {
+          return;
+        }
+
+        setTreemapHoverPosition(card, tooltip, event);
+      });
+      tile.addEventListener("mouseleave", () => {
+        clearActive();
       });
     });
   });
@@ -2642,6 +2798,7 @@ function renderApp(book) {
   `;
 
   hydratePortfolioCircleInteractions();
+  hydrateTreemapInteractions();
   scheduleTreemapTypographyFit();
 
   if (document.fonts?.ready) {
