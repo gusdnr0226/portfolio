@@ -138,6 +138,56 @@ const TREEMAP_CATEGORY_COLORS = {
   MM: "#b5a27b",
   "기타": "#7a859d",
 };
+const PORTFOLIO_CIRCLE_GROUPS = [
+  {
+    key: "SCHD",
+    label: "SCHD",
+    color: TREEMAP_CATEGORY_COLORS["SCHD"],
+    memberOrder: ["SCHD"],
+  },
+  {
+    key: "S&P500",
+    label: "S&P500",
+    color: TREEMAP_CATEGORY_COLORS["S&P500"],
+    memberOrder: ["S&P500"],
+  },
+  {
+    key: "Nasdaq",
+    label: "Nasdaq",
+    color: TREEMAP_CATEGORY_COLORS.Nasdaq,
+    memberOrder: ["Nasdaq"],
+  },
+  {
+    key: "커버드콜",
+    label: "커버드콜",
+    color: TREEMAP_CATEGORY_COLORS["커버드콜"],
+    memberOrder: ["커버드콜"],
+  },
+  {
+    key: "채권",
+    label: "채권",
+    color: TREEMAP_CATEGORY_COLORS["채권"],
+    memberOrder: ["채권"],
+  },
+  {
+    key: "해외기타",
+    label: "해외 기타",
+    color: "#5ca893",
+    memberOrder: ["부동산/리츠", "기타"],
+  },
+  {
+    key: "국내 주식/ETF",
+    label: "국내 주식/ETF",
+    color: "#7c9368",
+    memberOrder: ["배당ETF", "인프라", "제조", "통신", "금융"],
+  },
+  {
+    key: "현금성자산",
+    label: "현금성자산",
+    color: "#8e9ab4",
+    memberOrder: ["원화", "USD", "MM"],
+  },
+];
 const TREEMAP_CANVAS_ASPECT_DESKTOP = 16 / 10;
 const TREEMAP_CANVAS_ASPECT_TABLET = 1.16;
 const TREEMAP_CANVAS_ASPECT_MOBILE = 1;
@@ -160,6 +210,12 @@ const usdCurrencyFormatter = new Intl.NumberFormat("en-US", {
   currency: "USD",
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
+});
+const usdWholeCurrencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
 });
 const percentFormatter = new Intl.NumberFormat("ko-KR", {
   minimumFractionDigits: 2,
@@ -240,6 +296,14 @@ function getHoldingCurrency(holding) {
   return /^[0-9]/.test(holding?.ticker ?? "") ? "KRW" : "USD";
 }
 
+function getCashKrw(account) {
+  return Number(account?.cash ?? 0);
+}
+
+function getCashUsd(account) {
+  return Number(account?.cashUsd ?? 0);
+}
+
 function formatMoney(value, currency = "KRW") {
   if (currency === "USD") {
     return usdCurrencyFormatter.format(value);
@@ -261,6 +325,23 @@ function formatPrice(value, currency = "KRW") {
   return formatMoney(value, currency);
 }
 
+function formatHoldingMoney(value, currency = "KRW") {
+  if (currency === "USD") {
+    return usdWholeCurrencyFormatter.format(value);
+  }
+
+  return formatCurrency(value);
+}
+
+function formatSignedHoldingMoney(value, currency = "KRW") {
+  if (currency === "USD") {
+    const prefix = value > 0 ? "+" : value < 0 ? "-" : "";
+    return `${prefix}${usdWholeCurrencyFormatter.format(Math.abs(value))}`;
+  }
+
+  return formatSignedCurrency(value);
+}
+
 function formatAverageCost(value, currency = "KRW") {
   if (currency === "USD") {
     return usdCurrencyFormatter.format(value);
@@ -273,7 +354,7 @@ function formatAverageCost(value, currency = "KRW") {
 
 function formatQuantity(value) {
   const roundedValue = Number(value.toFixed(1));
-  return `${quantityFormatter.format(roundedValue)}주`;
+  return quantityFormatter.format(roundedValue);
 }
 
 function formatPercent(value) {
@@ -291,6 +372,20 @@ function formatTreemapCompactAmount(value) {
 function formatSignedPercent(value) {
   const prefix = value > 0 ? "+" : "";
   return `${prefix}${percentFormatter.format(value * 100)}%`;
+}
+
+function formatCashBreakdown(cashKrw, cashUsd) {
+  const parts = [];
+
+  if (cashKrw > 0) {
+    parts.push(`원화 ${formatCurrency(cashKrw)}`);
+  }
+
+  if (cashUsd > 0) {
+    parts.push(`달러 ${usdCurrencyFormatter.format(cashUsd)}`);
+  }
+
+  return parts.join(" + ");
 }
 
 function formatUpdatedAt(value) {
@@ -453,6 +548,10 @@ function getExternalQuoteTickers(portfolioSource) {
         needsUsdKrwRate = true;
       }
     });
+
+    if (getCashUsd(account) > 0) {
+      needsUsdKrwRate = true;
+    }
   });
 
   if (needsUsdKrwRate) {
@@ -688,6 +787,9 @@ function buildPortfolioData(source, livePriceSource) {
   const isFallbackSource = livePriceSource?.provider === "snapshot-fallback";
   const hasAutomaticQuotes = isAutomaticLivePriceSource(livePriceSource);
   const usdKrwRate = getUsdKrwRate(source, quotes);
+  const cashKrw = getCashKrw(source);
+  const cashUsd = getCashUsd(source);
+  const cashBase = cashKrw + convertToBaseCurrency(cashUsd, "USD", usdKrwRate);
 
   const enrichedHoldings = source.holdings.map((holding) => {
     const currency = getHoldingCurrency(holding);
@@ -741,9 +843,9 @@ function buildPortfolioData(source, livePriceSource) {
     },
   );
 
-  const totalAssets = totals.marketValue + source.cash;
+  const totalAssets = totals.marketValue + cashBase;
   const investedWeight = totalAssets === 0 ? 0 : totals.marketValue / totalAssets;
-  const cashWeight = totalAssets === 0 ? 0 : source.cash / totalAssets;
+  const cashWeight = totalAssets === 0 ? 0 : cashBase / totalAssets;
   const totalReturn = totals.costBasis === 0 ? 0 : totals.profitLoss / totals.costBasis;
 
   const holdingsWithWeight = enrichedHoldings.map((holding) => ({
@@ -755,7 +857,11 @@ function buildPortfolioData(source, livePriceSource) {
   return {
     ...source,
     holdings: holdingsWithWeight,
-    hasForeignCurrency: holdingCurrencies.some((currency) => currency !== "KRW"),
+    cash: cashKrw,
+    cashUsd,
+    cashBase,
+    hasForeignCurrency:
+      holdingCurrencies.some((currency) => currency !== "KRW") || cashUsd > 0,
     usdKrwRate,
     totals: {
       ...totals,
@@ -778,7 +884,9 @@ function buildBookData(source, livePriceSource) {
       accumulator.marketValue += portfolio.totals.marketValue;
       accumulator.costBasis += portfolio.totals.costBasis;
       accumulator.profitLoss += portfolio.totals.profitLoss;
-      accumulator.cash += portfolio.cash;
+      accumulator.cash += portfolio.cashBase;
+      accumulator.cashKrw += portfolio.cash;
+      accumulator.cashUsd += portfolio.cashUsd;
       accumulator.holdingsCount += portfolio.holdings.length;
       return accumulator;
     },
@@ -788,6 +896,8 @@ function buildBookData(source, livePriceSource) {
       costBasis: 0,
       profitLoss: 0,
       cash: 0,
+      cashKrw: 0,
+      cashUsd: 0,
       holdingsCount: 0,
     },
   );
@@ -897,10 +1007,14 @@ function buildTreemapData(book) {
         type: holding.type,
         currency: holding.currency,
         marketValueBase: 0,
+        costBasisBase: 0,
+        profitLossBase: 0,
         accountNames: new Set(),
       };
 
       existingAsset.marketValueBase += holding.marketValueBase;
+      existingAsset.costBasisBase += holding.costBasisBase;
+      existingAsset.profitLossBase += holding.profitLossBase;
       existingAsset.accountNames.add(portfolio.name);
       assetMap.set(key, existingAsset);
     });
@@ -913,12 +1027,39 @@ function buildTreemapData(book) {
         type: "현금",
         currency: "KRW",
         marketValueBase: 0,
+        costBasisBase: 0,
+        profitLossBase: 0,
         accountNames: new Set(),
       };
 
       existingCash.marketValueBase += portfolio.cash;
+      existingCash.costBasisBase += portfolio.cash;
       existingCash.accountNames.add(portfolio.name);
       assetMap.set(key, existingCash);
+    }
+
+    if (portfolio.cashUsd > 0) {
+      const key = "USD:USD";
+      const existingUsdCash = assetMap.get(key) ?? {
+        ticker: "USD",
+        name: "현금(USD)",
+        type: "현금",
+        currency: "USD",
+        marketValueBase: 0,
+        costBasisBase: 0,
+        profitLossBase: 0,
+        accountNames: new Set(),
+      };
+
+      const usdCashBase = convertToBaseCurrency(
+        portfolio.cashUsd,
+        "USD",
+        portfolio.usdKrwRate,
+      );
+      existingUsdCash.marketValueBase += usdCashBase;
+      existingUsdCash.costBasisBase += usdCashBase;
+      existingUsdCash.accountNames.add(portfolio.name);
+      assetMap.set(key, existingUsdCash);
     }
   });
 
@@ -944,6 +1085,8 @@ function buildTreemapData(book) {
       id: normalizeTreemapToken(asset.superCategory).replace(/\s+/g, "-"),
       name: asset.superCategory,
       marketValueBase: 0,
+      costBasisBase: 0,
+      profitLossBase: 0,
       categories: new Map(),
     };
     const existingCategory = existingSuperCategory.categories.get(asset.category) ?? {
@@ -951,12 +1094,18 @@ function buildTreemapData(book) {
       name: asset.category,
       superCategory: asset.superCategory,
       marketValueBase: 0,
+      costBasisBase: 0,
+      profitLossBase: 0,
       assets: [],
     };
 
     existingCategory.marketValueBase += asset.marketValueBase;
+    existingCategory.costBasisBase += asset.costBasisBase;
+    existingCategory.profitLossBase += asset.profitLossBase;
     existingCategory.assets.push(asset);
     existingSuperCategory.marketValueBase += asset.marketValueBase;
+    existingSuperCategory.costBasisBase += asset.costBasisBase;
+    existingSuperCategory.profitLossBase += asset.profitLossBase;
     existingSuperCategory.categories.set(asset.category, existingCategory);
     superCategoryMap.set(asset.superCategory, existingSuperCategory);
   });
@@ -1636,14 +1785,11 @@ function renderTreemapSection(book) {
     <section class="treemap-card">
       <div class="section-head">
         <div>
-          <h2 class="section-title">전체 종목 트리맵</h2>
-          <p class="section-copy">
-            면적은 전체 포트폴리오 내 원화 환산 평가금액 비중입니다. 해외와 국내를 먼저 나누고, 그 안에서 주신 분류 규칙 기준으로 카테고리와 종목을 묶었습니다.
-            같은 종목을 여러 계좌에서 들고 있으면 한 타일로 합산해서 보여줍니다.
-          </p>
+          <h2 class="section-title">Portfolio</h2>
         </div>
-        <div class="section-pill">총 ${currencyFormatter.format(treemap.assetCount)}자산</div>
       </div>
+
+      ${renderPortfolioCircleChart(treemap)}
 
       <div class="treemap-wrap">
         <div class="treemap-canvas">
@@ -1652,6 +1798,7 @@ function renderTreemapSection(book) {
       </div>
 
       <div class="treemap-footnote">
+        <span>원형 차트 = 요청한 8개 묶음</span>
         <span>면적 = KRW 환산 평가금액</span>
         <span>중복 보유 = 계좌별 합산</span>
         <span>현금 = 원화 현금 타일로 별도 집계</span>
@@ -1662,6 +1809,7 @@ function renderTreemapSection(book) {
 
 function buildMarketStatus(book) {
   const hasStoredQuotes = hasAppliedStoredQuotes(book);
+  const unavailableDirectPriceNote = formatUnavailableDirectPriceNote(book);
 
   if (state.isRefreshing) {
     return {
@@ -1670,6 +1818,7 @@ function buildMarketStatus(book) {
       detail:
         state.refreshDetail ??
         "Yahoo Finance 시세를 직접 확인하고, 실패하면 저장된 가격 파일을 사용합니다.",
+      note: unavailableDirectPriceNote,
     };
   }
 
@@ -1678,6 +1827,7 @@ function buildMarketStatus(book) {
       tone: "status-stale",
       title: hasStoredQuotes ? "새 시세 확인 실패" : "자동 시세 확인 실패",
       detail: getErrorMessage(state.refreshError),
+      note: unavailableDirectPriceNote,
     };
   }
 
@@ -1686,6 +1836,7 @@ function buildMarketStatus(book) {
       tone: "status-live",
       title: "외부 시세 자동 반영 중",
       detail: `${book.livePriceSource.provider} · 최근 반영 ${formatUpdatedAt(book.livePriceSource.updatedAt)}`,
+      note: unavailableDirectPriceNote,
     };
   }
 
@@ -1694,6 +1845,7 @@ function buildMarketStatus(book) {
       tone: "status-live",
       title: "저장된 최근 시세 반영 중",
       detail: `${book.livePriceSource?.provider ?? "가격 파일"} · 최근 반영 ${formatUpdatedAt(book.livePriceSource?.updatedAt)}`,
+      note: unavailableDirectPriceNote,
     };
   }
 
@@ -1703,6 +1855,7 @@ function buildMarketStatus(book) {
     detail: book.livePriceSource?.updatedAt
       ? `저장 파일 확인 ${formatUpdatedAt(book.livePriceSource.updatedAt)} · 현재 스냅샷과 동일`
       : "저장된 시세가 없어 마지막 스냅샷으로 계산합니다.",
+    note: unavailableDirectPriceNote,
   };
 }
 
@@ -1721,27 +1874,34 @@ function getPriceSourceLabel(priceSource) {
   }
 }
 
-function getPriceSourceDetail(priceSource) {
-  switch (priceSource) {
-    case "live":
-      return "외부 시세 직접 반영";
-    case "stored":
-      return "최근 저장 시세 반영";
-    case "mixed":
-      return "계좌별 시세 기준 혼합";
-    case "manual":
-      return "수동 기준 가격";
-    default:
-      return "스크린샷 기준";
+function formatUnavailableDirectPriceNote(book) {
+  const unavailableHoldings = buildAggregatedHoldings(book).filter(
+    (holding) => holding.priceSource !== "live",
+  );
+
+  if (!unavailableHoldings.length) {
+    return "";
   }
+
+  const previewLimit = 3;
+  const previewNames = unavailableHoldings
+    .slice(0, previewLimit)
+    .map((holding) => holding.name)
+    .join(", ");
+  const remainingCount = unavailableHoldings.length - Math.min(unavailableHoldings.length, previewLimit);
+  const remainingText =
+    remainingCount > 0 ? ` 외 ${currencyFormatter.format(remainingCount)}종목` : "";
+
+  return `직접 현재가를 못 불러온 ${currencyFormatter.format(unavailableHoldings.length)}종목: ${previewNames}${remainingText}`;
 }
 
 function renderSummaryCards(portfolio) {
+  const cashBreakdown = formatCashBreakdown(portfolio.cash, portfolio.cashUsd);
   const cards = [
     {
       label: "총자산",
       value: formatCurrency(portfolio.totals.totalAssets),
-      detail: `주식 ${formatCurrency(portfolio.totals.marketValue)} + 현금 ${formatCurrency(portfolio.cash)}`,
+      detail: `주식 ${formatCurrency(portfolio.totals.marketValue)} + 현금 ${formatCurrency(portfolio.cashBase)}`,
       tone: "",
     },
     {
@@ -1752,8 +1912,10 @@ function renderSummaryCards(portfolio) {
     },
     {
       label: "현금",
-      value: formatCurrency(portfolio.cash),
-      detail: `총자산 비중 ${formatPercent(portfolio.totals.cashWeight)}`,
+      value: formatCurrency(portfolio.cashBase),
+      detail: portfolio.cashUsd > 0 && cashBreakdown
+        ? `${cashBreakdown} · 총자산 비중 ${formatPercent(portfolio.totals.cashWeight)}`
+        : `총자산 비중 ${formatPercent(portfolio.totals.cashWeight)}`,
       tone: "",
     },
     {
@@ -1778,6 +1940,7 @@ function renderSummaryCards(portfolio) {
 }
 
 function renderBookSummaryCards(book) {
+  const cashBreakdown = formatCashBreakdown(book.overview.cashKrw, book.overview.cashUsd);
   const cards = [
     {
       label: "전체 총자산",
@@ -1794,7 +1957,9 @@ function renderBookSummaryCards(book) {
     {
       label: "전체 현금",
       value: formatCurrency(book.overview.cash),
-      detail: `${book.portfolios.length}개 계좌 운영`,
+      detail: book.overview.cashUsd > 0 && cashBreakdown
+        ? `${cashBreakdown} · ${book.portfolios.length}개 계좌 운영`
+        : `${book.portfolios.length}개 계좌 운영`,
       tone: "",
     },
     {
@@ -1850,7 +2015,7 @@ function renderAccountOverviewCards(book) {
             </div>
             <div class="overview-metric">
               <span>현금</span>
-              <strong>${formatCurrency(portfolio.cash)}</strong>
+              <strong>${formatCurrency(portfolio.cashBase)}</strong>
             </div>
             <div class="overview-metric">
               <span>보유 종목</span>
@@ -1942,6 +2107,265 @@ function formatAggregatedHoldingNote(holding) {
   return `${holding.accountNames.join(", ")} 합산`;
 }
 
+function resolvePortfolioCircleGroup(category) {
+  switch (category.name) {
+    case "SCHD":
+    case "S&P500":
+    case "Nasdaq":
+    case "커버드콜":
+    case "채권":
+      return category.name;
+    case "원화":
+    case "USD":
+    case "MM":
+      return "현금성자산";
+    default:
+      return category.superCategory === "국내" ? "국내 주식/ETF" : "해외기타";
+  }
+}
+
+function buildPortfolioCircleGroups(treemap) {
+  if (!treemap) {
+    return [];
+  }
+
+  const groups = new Map(
+    PORTFOLIO_CIRCLE_GROUPS.map((group) => [
+      group.key,
+      {
+        ...group,
+        marketValueBase: 0,
+        costBasisBase: 0,
+        profitLossBase: 0,
+        members: new Set(),
+        assetMap: new Map(),
+      },
+    ]),
+  );
+
+  treemap.superCategories.forEach((superCategory) => {
+    superCategory.categories.forEach((category) => {
+      const groupKey = resolvePortfolioCircleGroup(category);
+      const group = groups.get(groupKey);
+
+      if (!group) {
+        return;
+      }
+
+      group.marketValueBase += category.marketValueBase;
+      group.costBasisBase += category.costBasisBase;
+      group.profitLossBase += category.profitLossBase;
+      group.members.add(category.name);
+
+      category.assets.forEach((asset) => {
+        const assetKey = `${asset.currency}:${asset.ticker}`;
+        const existingAsset = group.assetMap.get(assetKey) ?? {
+          name: asset.name,
+          marketValueBase: 0,
+        };
+
+        existingAsset.marketValueBase += asset.marketValueBase;
+        group.assetMap.set(assetKey, existingAsset);
+      });
+    });
+  });
+
+  return PORTFOLIO_CIRCLE_GROUPS
+    .map((group) => {
+      const resolvedGroup = groups.get(group.key);
+      const orderedMembers = group.memberOrder.filter((member) => resolvedGroup.members.has(member));
+      const remainingMembers = [...resolvedGroup.members]
+        .filter((member) => !orderedMembers.includes(member))
+        .sort((left, right) => left.localeCompare(right, "ko-KR"));
+      const members = [...orderedMembers, ...remainingMembers];
+      const topAssets = [...resolvedGroup.assetMap.values()]
+        .sort(
+          (left, right) =>
+            right.marketValueBase - left.marketValueBase ||
+            left.name.localeCompare(right.name, "ko-KR"),
+        )
+        .slice(0, 2)
+        .map((asset) => asset.name);
+
+      return {
+        ...resolvedGroup,
+        members,
+        detail: topAssets.join(", "),
+        dividendWeightText: "-",
+        weight:
+          treemap.totalAssets === 0 ? 0 : resolvedGroup.marketValueBase / treemap.totalAssets,
+      };
+    })
+    .filter((group) => group.marketValueBase > 0);
+}
+
+function buildPortfolioCircleSegments(groups) {
+  const radius = 36;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+
+  return groups.map((group) => {
+    const segmentLength = circumference * group.weight;
+    const gapLength = Math.min(circumference * 0.008, segmentLength * 0.3);
+    const visibleLength = Math.max(segmentLength - gapLength, 0);
+    const segment = {
+      ...group,
+      radius,
+      dasharray: `${visibleLength.toFixed(3)} ${(circumference - visibleLength).toFixed(3)}`,
+      dashoffset: `${(-offset).toFixed(3)}`,
+    };
+
+    offset += segmentLength;
+    return segment;
+  });
+}
+
+function renderPortfolioCircleChart(treemap) {
+  const groups = buildPortfolioCircleGroups(treemap);
+
+  if (!groups.length) {
+    return "";
+  }
+
+  const sortedGroups = [...groups].sort(
+    (left, right) =>
+      right.marketValueBase - left.marketValueBase ||
+      left.label.localeCompare(right.label, "ko-KR"),
+  );
+  const segments = buildPortfolioCircleSegments(sortedGroups);
+  const totalCostBasis = sortedGroups.reduce((sum, group) => sum + group.costBasisBase, 0);
+  const totalProfitLoss = sortedGroups.reduce((sum, group) => sum + group.profitLossBase, 0);
+  const totalReturn = totalCostBasis === 0 ? 0 : totalProfitLoss / totalCostBasis;
+  const chartAriaLabel = sortedGroups
+    .map((group) => `${group.label} ${formatPercent(group.weight)}`)
+    .join(", ");
+
+  return `
+    <article class="portfolio-circle-card">
+      <div class="portfolio-circle-layout">
+        <div class="portfolio-circle-visual">
+          <div class="portfolio-circle-plot">
+            <svg class="portfolio-circle-svg" viewBox="0 0 120 120" role="img" aria-label="포트폴리오 원형 차트: ${chartAriaLabel}">
+              <circle class="portfolio-circle-track" cx="60" cy="60" r="36" fill="none"></circle>
+              ${segments
+                .map(
+                  (segment) => `
+                    <circle
+                      class="portfolio-circle-segment"
+                      data-circle-group="${segment.key}"
+                      cx="60"
+                      cy="60"
+                      r="${segment.radius}"
+                      fill="none"
+                      stroke="${segment.color}"
+                      stroke-dasharray="${segment.dasharray}"
+                      stroke-dashoffset="${segment.dashoffset}"
+                    ></circle>
+                  `,
+                )
+                .join("")}
+            </svg>
+            <div class="portfolio-circle-summary">
+              <strong>${formatCurrency(treemap.totalAssets)}</strong>
+              <div class="portfolio-circle-summary-meta">
+                <span class="${getToneClass(totalProfitLoss)}">${formatSignedCurrency(totalProfitLoss)}</span>
+                <span class="${getToneClass(totalReturn)}">${formatSignedPercent(totalReturn)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="portfolio-circle-side">
+          <div class="portfolio-circle-table">
+            <div class="portfolio-circle-table-head">
+              <span>카테고리</span>
+              <span>평가금액</span>
+              <span>매수금액 / 손익</span>
+              <span>비중</span>
+            </div>
+
+            <div class="portfolio-circle-list">
+              ${sortedGroups
+                .map(
+                  (group) => `
+                    <div class="portfolio-circle-item" data-circle-group="${group.key}">
+                      <div class="portfolio-circle-cell portfolio-circle-label">
+                        <div class="portfolio-circle-main">
+                          <span class="portfolio-circle-swatch" style="background:${group.color};" aria-hidden="true"></span>
+                          <strong>${group.label}</strong>
+                        </div>
+                        ${group.detail ? `<span class="portfolio-circle-detail">${group.detail}</span>` : ""}
+                      </div>
+                      <div class="portfolio-circle-cell portfolio-circle-value">
+                        <strong>${formatCurrency(group.marketValueBase)}</strong>
+                      </div>
+                      <div class="portfolio-circle-cell portfolio-circle-profit">
+                        <strong>${formatCurrency(group.costBasisBase)}</strong>
+                        <span class="${getToneClass(group.profitLossBase)}">${formatSignedCurrency(group.profitLossBase)}</span>
+                      </div>
+                      <div class="portfolio-circle-cell portfolio-circle-weight">
+                        <strong>${formatPercent(group.weight)}</strong>
+                      </div>
+                    </div>
+                  `,
+                )
+                .join("")}
+            </div>
+
+            <div class="portfolio-circle-total">
+              <div class="portfolio-circle-cell portfolio-circle-label">
+                <strong>합계</strong>
+              </div>
+              <div class="portfolio-circle-cell portfolio-circle-value">
+                <strong>${formatCurrency(treemap.totalAssets)}</strong>
+              </div>
+              <div class="portfolio-circle-cell portfolio-circle-profit">
+                <strong>${formatCurrency(totalCostBasis)}</strong>
+                <span class="${getToneClass(totalProfitLoss)}">${formatSignedCurrency(totalProfitLoss)}</span>
+              </div>
+              <div class="portfolio-circle-cell portfolio-circle-weight">
+                <strong>100.00%</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function setPortfolioCircleActiveGroup(card, activeGroup) {
+  if (!card) {
+    return;
+  }
+
+  card.querySelectorAll("[data-circle-group]").forEach((element) => {
+    const isActive = activeGroup && element.dataset.circleGroup === activeGroup;
+    const isDimmed = activeGroup && element.dataset.circleGroup !== activeGroup;
+
+    element.classList.toggle("is-active", Boolean(isActive));
+    element.classList.toggle("is-dimmed", Boolean(isDimmed));
+  });
+}
+
+function hydratePortfolioCircleInteractions() {
+  document.querySelectorAll(".portfolio-circle-card").forEach((card) => {
+    card.querySelectorAll("[data-circle-group]").forEach((element) => {
+      if (element.dataset.circleBound === "true") {
+        return;
+      }
+
+      element.dataset.circleBound = "true";
+      element.addEventListener("mouseenter", () => {
+        setPortfolioCircleActiveGroup(card, element.dataset.circleGroup);
+      });
+      element.addEventListener("mouseleave", () => {
+        setPortfolioCircleActiveGroup(card, "");
+      });
+    });
+  });
+}
+
 function renderAllHoldingsRows(book) {
   return buildAggregatedHoldings(book)
     .map(
@@ -1954,13 +2378,12 @@ function renderAllHoldingsRows(book) {
           <td>
             <div class="metric">
               <strong>${formatPrice(holding.currentPrice, holding.currency)}</strong>
-              <span>${getPriceSourceDetail(holding.priceSource)}</span>
             </div>
           </td>
           <td>${formatAverageCost(holding.averageCost, holding.currency)}</td>
-          <td>${formatMoney(holding.costBasis, holding.currency)}</td>
-          <td>${formatMoney(holding.marketValue, holding.currency)}</td>
-          <td class="${getToneClass(holding.profitLoss)}">${formatSignedMoney(holding.profitLoss, holding.currency)}</td>
+          <td>${formatHoldingMoney(holding.costBasis, holding.currency)}</td>
+          <td>${formatHoldingMoney(holding.marketValue, holding.currency)}</td>
+          <td class="${getToneClass(holding.profitLoss)}">${formatSignedHoldingMoney(holding.profitLoss, holding.currency)}</td>
           <td class="${getToneClass(holding.profitRate)}">${formatSignedPercent(holding.profitRate)}</td>
           <td>${formatPercent(holding.assetWeight)}</td>
           <td>${formatAggregatedHoldingNote(holding)}</td>
@@ -1990,13 +2413,12 @@ function renderTableRows(portfolio) {
           <td>
             <div class="metric">
               <strong>${formatPrice(holding.currentPrice, holding.currency)}</strong>
-              <span>${getPriceSourceDetail(holding.priceSource)}</span>
             </div>
           </td>
           <td>${formatAverageCost(holding.averageCost, holding.currency)}</td>
-          <td>${formatMoney(holding.costBasis, holding.currency)}</td>
-          <td>${formatMoney(holding.marketValue, holding.currency)}</td>
-          <td class="${getToneClass(holding.profitLoss)}">${formatSignedMoney(holding.profitLoss, holding.currency)}</td>
+          <td>${formatHoldingMoney(holding.costBasis, holding.currency)}</td>
+          <td>${formatHoldingMoney(holding.marketValue, holding.currency)}</td>
+          <td class="${getToneClass(holding.profitLoss)}">${formatSignedHoldingMoney(holding.profitLoss, holding.currency)}</td>
           <td class="${getToneClass(holding.profitRate)}">${formatSignedPercent(holding.profitRate)}</td>
           <td>${formatPercent(holding.assetWeight)}</td>
         </tr>
@@ -2174,47 +2596,20 @@ function renderApp(book) {
 
   app.innerHTML = `
     <section class="dashboard">
-      <section class="hero">
-        <div class="eyebrow">All Accounts</div>
-        <div class="hero-head">
-          <div>
-            <h1 class="hero-title">전체 포트폴리오</h1>
-            <p class="hero-copy">
-              절세계좌와 직투계좌를 같은 기준으로 묶어 총자산, 손익, 현금, 계좌별 보유 현황을 한 화면에서 점검할 수 있게 구성했습니다.
-              미국 종목은 USD 기준으로 표기하고, 계좌와 전체 합계는 KRW 환산 기준으로 계산합니다.
-              브라우저에서 외부 시세를 직접 확인하고, 응답이 없으면 저장된 최신 가격 파일을 폴백으로 사용합니다.
-            </p>
-          </div>
-          <div class="account-pill">기준 통화 ${book.meta.currency}</div>
-        </div>
-
-        <div class="hero-toolbar">
+      <section class="overview-section">
+        <div class="hero-toolbar dashboard-toolbar">
           <div class="market-status ${marketStatus.tone}">
             <span class="status-dot"></span>
             <div>
               <strong>${marketStatus.title}</strong>
               <span>${marketStatus.detail}</span>
+              ${marketStatus.note ? `<span>${marketStatus.note}</span>` : ""}
             </div>
           </div>
           <div class="toolbar-actions">
             <button class="ghost-button" data-refresh-quotes ${state.isRefreshing ? "disabled" : ""}>
               ${state.isRefreshing ? "시세 불러오는 중..." : "시세 다시 불러오기"}
             </button>
-          </div>
-        </div>
-
-        <div class="summary-grid">
-          ${renderBookSummaryCards(book)}
-        </div>
-      </section>
-
-      <section class="overview-section">
-        <div class="section-head overview-section-head">
-          <div>
-            <h2 class="section-title">계좌 한눈에 보기</h2>
-            <p class="section-copy">
-              전체 종목 트리맵으로 비중을 먼저 보고, 각 계좌의 총자산, 손익, 현금, 투자 비중은 아래 카드에서 바로 이어서 확인하면 됩니다.
-            </p>
           </div>
         </div>
 
@@ -2246,6 +2641,7 @@ function renderApp(book) {
     </section>
   `;
 
+  hydratePortfolioCircleInteractions();
   scheduleTreemapTypographyFit();
 
   if (document.fonts?.ready) {

@@ -155,6 +155,11 @@ body::before {
   margin-top: 22px;
 }
 
+.dashboard-toolbar {
+  margin-top: 0;
+  padding: 12px 16px 18px;
+}
+
 .toolbar-actions {
   display: inline-flex;
   flex-wrap: wrap;
@@ -747,6 +752,254 @@ body::before {
   font-weight: 700;
 }
 
+.portfolio-circle-card {
+  margin: 0 18px 18px;
+  padding: 22px;
+  border: 1px solid rgba(126, 144, 171, 0.18);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at top right, rgba(111, 169, 216, 0.12), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(242, 248, 246, 0.98));
+}
+
+.portfolio-circle-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: center;
+}
+
+.portfolio-circle-visual {
+  display: flex;
+  justify-content: center;
+}
+
+.portfolio-circle-plot {
+  position: relative;
+  width: min(100%, 300px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+.portfolio-circle-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  filter: drop-shadow(0 18px 34px rgba(112, 134, 158, 0.18));
+}
+
+.portfolio-circle-track,
+.portfolio-circle-segment {
+  stroke-width: 14;
+}
+
+.portfolio-circle-track {
+  stroke: rgba(126, 144, 171, 0.12);
+}
+
+.portfolio-circle-segment {
+  stroke-linecap: butt;
+  cursor: pointer;
+  opacity: 0.96;
+  transition:
+    opacity 160ms ease,
+    stroke-width 160ms ease,
+    filter 160ms ease;
+}
+
+.portfolio-circle-summary {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  width: min(54%, 138px);
+  padding: 0;
+  text-align: center;
+  pointer-events: none;
+}
+
+.portfolio-circle-summary strong {
+  font-size: clamp(0.92rem, 0.5vw + 0.84rem, 1.12rem);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.portfolio-circle-summary-meta {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-size: 0.76rem;
+  line-height: 1.2;
+}
+
+.portfolio-circle-summary-meta span {
+  white-space: nowrap;
+}
+
+.portfolio-circle-side,
+.portfolio-circle-copy,
+.portfolio-circle-table,
+.portfolio-circle-list {
+  display: grid;
+}
+
+.portfolio-circle-side {
+  gap: 16px;
+}
+
+.portfolio-circle-copy {
+  gap: 6px;
+}
+
+.portfolio-circle-title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.portfolio-circle-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.portfolio-circle-table {
+  gap: 0;
+}
+
+.portfolio-circle-table-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(104px, 0.88fr) minmax(116px, 0.96fr) minmax(72px, 0.46fr);
+  gap: 16px;
+  align-items: end;
+  min-width: 500px;
+  padding: 10px 12px;
+  margin-bottom: 2px;
+  color: rgba(34, 45, 65, 0.82);
+  font-size: 0.79rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: rgba(126, 144, 171, 0.08);
+  border-top: 1px solid rgba(126, 144, 171, 0.12);
+  border-bottom: 1px solid rgba(126, 144, 171, 0.12);
+  border-radius: 14px;
+}
+
+.portfolio-circle-table-head span:not(:first-child) {
+  text-align: right;
+}
+
+.portfolio-circle-list {
+  gap: 0;
+  overflow-x: auto;
+}
+
+.portfolio-circle-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(104px, 0.88fr) minmax(116px, 0.96fr) minmax(72px, 0.46fr);
+  gap: 16px;
+  align-items: center;
+  min-width: 500px;
+  padding: 14px 12px;
+  border-top: 1px solid rgba(126, 144, 171, 0.12);
+  border-radius: 14px;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+.portfolio-circle-total {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(104px, 0.88fr) minmax(116px, 0.96fr) minmax(72px, 0.46fr);
+  gap: 16px;
+  align-items: center;
+  min-width: 500px;
+  margin-top: 6px;
+  padding: 14px 12px 0;
+  border-top: 1px solid rgba(34, 45, 65, 0.18);
+}
+
+.portfolio-circle-cell,
+.portfolio-circle-label {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.portfolio-circle-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.portfolio-circle-main strong {
+  font-size: 0.94rem;
+  line-height: 1.35;
+}
+
+.portfolio-circle-total .portfolio-circle-label strong {
+  font-size: 0.94rem;
+  line-height: 1.35;
+}
+
+.portfolio-circle-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.portfolio-circle-detail {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  padding-left: 22px;
+}
+
+.portfolio-circle-value,
+.portfolio-circle-profit,
+.portfolio-circle-weight {
+  justify-items: end;
+  text-align: right;
+}
+
+.portfolio-circle-value strong,
+.portfolio-circle-profit strong,
+.portfolio-circle-weight strong {
+  font-size: 0.92rem;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.portfolio-circle-profit span {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.portfolio-circle-segment.is-active {
+  stroke-width: 18;
+  opacity: 1;
+  filter: saturate(1.08);
+}
+
+.portfolio-circle-segment.is-dimmed {
+  opacity: 0.24;
+}
+
+.portfolio-circle-item.is-active {
+  background: rgba(126, 144, 171, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(126, 144, 171, 0.18);
+}
+
+.portfolio-circle-item.is-dimmed {
+  opacity: 0.48;
+}
+
 .account-jump-list {
   display: flex;
   flex-wrap: wrap;
@@ -1029,6 +1282,19 @@ tfoot td {
     padding: 0;
   }
 
+  .portfolio-circle-card {
+    margin: 0 0 16px;
+  }
+
+  .portfolio-circle-layout {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .portfolio-circle-side {
+    width: 100%;
+  }
+
   .treemap-wrap {
     padding: 0 0 16px;
   }
@@ -1054,7 +1320,8 @@ tfoot td {
 
 @media (max-width: 640px) {
   .overview-card,
-  .focus-card {
+  .focus-card,
+  .portfolio-circle-card {
     padding-left: 16px;
     padding-right: 16px;
   }
@@ -1081,6 +1348,39 @@ tfoot td {
 
   .treemap-canvas {
     min-height: 900px;
+  }
+
+  .portfolio-circle-plot {
+    width: min(100%, 248px);
+  }
+
+  .portfolio-circle-summary {
+    width: min(60%, 126px);
+  }
+
+  .portfolio-circle-table-head,
+  .portfolio-circle-item,
+  .portfolio-circle-total {
+    min-width: 440px;
+    gap: 12px;
+    grid-template-columns: minmax(0, 1.45fr) minmax(96px, 0.86fr) minmax(108px, 0.94fr) minmax(64px, 0.42fr);
+  }
+
+  .portfolio-circle-table-head {
+    font-size: 0.68rem;
+  }
+
+  .portfolio-circle-main strong,
+  .portfolio-circle-total .portfolio-circle-label strong,
+  .portfolio-circle-value strong,
+  .portfolio-circle-profit strong,
+  .portfolio-circle-weight strong {
+    font-size: 0.86rem;
+  }
+
+  .portfolio-circle-detail,
+  .portfolio-circle-profit span {
+    font-size: 0.76rem;
   }
 
   .treemap-super-head,

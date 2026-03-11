@@ -327,7 +327,8 @@
       "id": "direct-investment",
       "name": "직투계좌",
       "snapshotLabel": "2026년 3월 10일 21:32 스크린샷 기준",
-      "cash": 0,
+      "cash": 1813511,
+      "cashUsd": 2059.62,
       "snapshotUsdKrw": 1472.18,
       "holdings": [
         {
