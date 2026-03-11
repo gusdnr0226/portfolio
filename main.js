@@ -149,7 +149,7 @@ const compactCurrencyFormatter = new Intl.NumberFormat("ko-KR", {
 });
 const quantityFormatter = new Intl.NumberFormat("ko-KR", {
   minimumFractionDigits: 0,
-  maximumFractionDigits: 6,
+  maximumFractionDigits: 1,
 });
 const decimalFormatter = new Intl.NumberFormat("ko-KR", {
   minimumFractionDigits: 0,
@@ -272,7 +272,7 @@ function formatAverageCost(value, currency = "KRW") {
 }
 
 function formatQuantity(value) {
-  const roundedValue = Number(value.toFixed(6));
+  const roundedValue = Number(value.toFixed(1));
   return `${quantityFormatter.format(roundedValue)}주`;
 }
 
@@ -1949,15 +1949,6 @@ function renderAllHoldingsRows(book) {
         <tr>
           <td>
             <div class="asset-name">${holding.name}</div>
-            <div class="asset-meta">
-              <span class="tag">${holding.type}</span>
-              <span class="tag">${holding.ticker}</span>
-              ${holding.currency !== "KRW" ? `<span class="tag">${holding.currency}</span>` : ""}
-              <span class="tag ${holding.priceSource === "snapshot" || holding.priceSource === "manual" ? "tag-warning" : "tag-live"}">
-                ${getPriceSourceLabel(holding.priceSource)}
-              </span>
-              ${holding.nameInferred ? '<span class="tag tag-warning">이름 추정</span>' : ""}
-            </div>
           </td>
           <td>${formatQuantity(holding.quantity)}</td>
           <td>
