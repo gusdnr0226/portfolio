@@ -1,0 +1,229 @@
+{
+  "provider": "Stock Analysis",
+  "updatedAt": "2026-03-12T11:47:57Z",
+  "methodology": "Trailing 12-month annual dividend per share shown on Stock Analysis dividend pages.",
+  "dividends": {
+    "003545": {
+      "name": "대신증권우",
+      "annualDividendPerShare": 1250,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/003545/dividend/"
+    },
+    "0038A0": {
+      "name": "KODEX 미국휴머노이드로봇",
+      "annualDividendPerShare": 32,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/0038A0/dividend/"
+    },
+    "0052D0": {
+      "name": "TIGER 코리아배당다우존스",
+      "annualDividendPerShare": 396,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/0052D0/dividend/"
+    },
+    "005385": {
+      "name": "현대차우",
+      "annualDividendPerShare": 10050,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/005385/dividend/"
+    },
+    "005389": {
+      "name": "현대차3우B",
+      "annualDividendPerShare": 10050,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/005389/dividend/"
+    },
+    "0098N0": {
+      "name": "PLUS 자사주매입고배당주",
+      "annualDividendPerShare": 185,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/0098N0/dividend/"
+    },
+    "0144L0": {
+      "name": "KODEX 미국성장커버드콜액티브",
+      "annualDividendPerShare": 191,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/0144L0/dividend/"
+    },
+    "017670": {
+      "name": "SK텔레콤",
+      "annualDividendPerShare": 3540,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/017670/dividend/"
+    },
+    "024110": {
+      "name": "기업은행",
+      "annualDividendPerShare": 1065,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/024110/dividend/"
+    },
+    "086790": {
+      "name": "하나금융지주",
+      "annualDividendPerShare": 4105,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/086790/dividend/"
+    },
+    "088980": {
+      "name": "맥쿼리인프라",
+      "annualDividendPerShare": 760,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/088980/dividend/"
+    },
+    "251600": {
+      "name": "PLUS 고배당주채권혼합",
+      "annualDividendPerShare": 546,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/251600/dividend/"
+    },
+    "316140": {
+      "name": "우리금융지주",
+      "annualDividendPerShare": 1360,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/316140/dividend/"
+    },
+    "379800": {
+      "name": "KODEX 미국S&P500",
+      "annualDividendPerShare": 389,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/379800/dividend/"
+    },
+    "379810": {
+      "name": "KODEX 미국나스닥100",
+      "annualDividendPerShare": 223,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/379810/dividend/"
+    },
+    "390390": {
+      "name": "KODEX 미국반도체",
+      "annualDividendPerShare": 193,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/390390/dividend/"
+    },
+    "415640": {
+      "name": "KB발해인프라",
+      "annualDividendPerShare": 650,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/415640/dividend/"
+    },
+    "418660": {
+      "name": "TIGER 미국나스닥100레버리지(합성)",
+      "annualDividendPerShare": 380,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/418660/dividend/"
+    },
+    "438080": {
+      "name": "ACE 미국S&P500미국채혼합50액티브",
+      "annualDividendPerShare": 334,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/438080/dividend/"
+    },
+    "441640": {
+      "name": "KODEX 미국배당커버드콜액티브",
+      "annualDividendPerShare": 1130,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/441640/dividend/"
+    },
+    "446720": {
+      "name": "SOL 미국배당다우존스",
+      "annualDividendPerShare": 393,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/446720/dividend/"
+    },
+    "458730": {
+      "name": "TIGER 미국배당다우존스",
+      "annualDividendPerShare": 420,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/458730/dividend/"
+    },
+    "458760": {
+      "name": "TIGER 미국배당다우존스타겟커버드콜2호",
+      "annualDividendPerShare": 1047,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/458760/dividend/"
+    },
+    "476800": {
+      "name": "KODEX 한국부동산리츠인프라",
+      "annualDividendPerShare": 406,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/476800/dividend/"
+    },
+    "488770": {
+      "name": "KODEX 머니마켓액티브",
+      "annualDividendPerShare": 1498,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/488770/dividend/"
+    },
+    "493420": {
+      "name": "SOL 미국배당다우존스2호",
+      "annualDividendPerShare": 251,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/493420/dividend/"
+    },
+    "498400": {
+      "name": "KODEX 200타겟위클리커버드콜",
+      "annualDividendPerShare": 2067,
+      "currency": "KRW",
+      "sourceUrl": "https://stockanalysis.com/quote/krx/498400/dividend/"
+    },
+    "AGNC": {
+      "name": "AGNC 인베스트먼트",
+      "annualDividendPerShare": 1.44,
+      "currency": "USD",
+      "sourceUrl": "https://stockanalysis.com/stocks/agnc/dividend/"
+    },
+    "IEF": {
+      "name": "IEF",
+      "annualDividendPerShare": 3.65,
+      "currency": "USD",
+      "sourceUrl": "https://stockanalysis.com/etf/ief/dividend/"
+    },
+    "JEPI": {
+      "name": "JEPI",
+      "annualDividendPerShare": 4.76,
+      "currency": "USD",
+      "sourceUrl": "https://stockanalysis.com/etf/jepi/dividend/"
+    },
+    "JEPQ": {
+      "name": "JEPQ",
+      "annualDividendPerShare": 6.16,
+      "currency": "USD",
+      "sourceUrl": "https://stockanalysis.com/etf/jepq/dividend/"
+    },
+    "O": {
+      "name": "리얼티 인컴",
+      "annualDividendPerShare": 3.24,
+      "currency": "USD",
+      "sourceUrl": "https://stockanalysis.com/stocks/o/dividend/"
+    },
+    "QQQ": {
+      "name": "QQQ",
+      "annualDividendPerShare": 2.79,
+      "currency": "USD",
+      "sourceUrl": "https://stockanalysis.com/etf/qqq/dividend/"
+    },
+    "SCHD": {
+      "name": "SCHD",
+      "annualDividendPerShare": 1.05,
+      "currency": "USD",
+      "sourceUrl": "https://stockanalysis.com/etf/schd/dividend/"
+    },
+    "TLT": {
+      "name": "TLT",
+      "annualDividendPerShare": 3.89,
+      "currency": "USD",
+      "sourceUrl": "https://stockanalysis.com/etf/tlt/dividend/"
+    },
+    "ULTY": {
+      "name": "ULTY",
+      "annualDividendPerShare": 41.33,
+      "currency": "USD",
+      "sourceUrl": "https://stockanalysis.com/etf/ulty/dividend/"
+    },
+    "VOO": {
+      "name": "VOO",
+      "annualDividendPerShare": 7.07,
+      "currency": "USD",
+      "sourceUrl": "https://stockanalysis.com/etf/voo/dividend/"
+    }
+  }
+}

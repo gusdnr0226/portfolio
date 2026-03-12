@@ -1,5 +1,6 @@
 const PORTFOLIOS_URL = "./data/portfolios.json";
 const LIVE_PRICES_URL = "./data/live-prices.json";
+const DIVIDENDS_URL = "./data/dividends.json";
 const GITHUB_API_BASE_URL = "https://api.github.com/repos/gusdnr0226/portfolio";
 const GITHUB_LIVE_PRICES_URL =
   `${GITHUB_API_BASE_URL}/contents/data/live-prices.json?ref=main`;
@@ -188,7 +189,6 @@ const PORTFOLIO_CIRCLE_GROUPS = [
     memberOrder: ["원화", "USD", "MM"],
   },
 ];
-const PORTFOLIO_DIVIDEND_YIELD_ASSUMPTION = 0.05;
 const TREEMAP_CANVAS_ASPECT_DESKTOP = 16 / 10;
 const TREEMAP_CANVAS_ASPECT_TABLET = 1.16;
 const TREEMAP_CANVAS_ASPECT_MOBILE = 1;
@@ -211,6 +211,12 @@ const usdCurrencyFormatter = new Intl.NumberFormat("en-US", {
   currency: "USD",
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
+});
+const usdCompactCurrencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
 });
 const usdWholeCurrencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -235,6 +241,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
 const state = {
   portfolioSource: null,
   livePriceSource: null,
+  dividendSource: null,
   isRefreshing: false,
   refreshError: null,
   refreshPhase: null,
@@ -243,6 +250,7 @@ const state = {
 };
 let treemapTypographyFrameId = 0;
 let treemapResizeFrameId = 0;
+let sidebarSectionObserver = null;
 
 function normalizeTreemapToken(value) {
   return String(value ?? "")
@@ -309,6 +317,11 @@ function getCashUsd(account) {
   return Number(account?.cashUsd ?? 0);
 }
 
+function getAnnualDividendPerShare(dividendSource, holding) {
+  const annualDividendPerShare = dividendSource?.dividends?.[holding?.ticker]?.annualDividendPerShare;
+  return Number.isFinite(annualDividendPerShare) ? annualDividendPerShare : 0;
+}
+
 function formatMoney(value, currency = "KRW") {
   if (currency === "USD") {
     return usdCurrencyFormatter.format(value);
@@ -347,6 +360,31 @@ function formatSignedHoldingMoney(value, currency = "KRW") {
   return formatSignedCurrency(value);
 }
 
+function formatOverallMoney(value, currency = "KRW") {
+  if (currency === "USD") {
+    return usdCompactCurrencyFormatter.format(Number(value.toFixed(1)));
+  }
+
+  return formatCurrency(value);
+}
+
+function formatSignedOverallMoney(value, currency = "KRW") {
+  if (currency === "USD") {
+    const prefix = value > 0 ? "+" : value < 0 ? "-" : "";
+    return `${prefix}${usdCompactCurrencyFormatter.format(Number(Math.abs(value).toFixed(1)))}`;
+  }
+
+  return formatSignedCurrency(value);
+}
+
+function formatOverallAverageCost(value, currency = "KRW") {
+  return formatOverallMoney(value, currency);
+}
+
+function formatOverallProfitWithRate(profitLoss, profitRate, currency = "KRW") {
+  return `${formatSignedOverallMoney(profitLoss, currency)}(${formatSignedPercentCompact(profitRate)})`;
+}
+
 function formatAverageCost(value, currency = "KRW") {
   if (currency === "USD") {
     return usdCurrencyFormatter.format(value);
@@ -383,12 +421,25 @@ function formatSignedPercent(value) {
   return `${prefix}${percentFormatter.format(value * 100)}%`;
 }
 
+function formatSignedPercentCompact(value) {
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${weightPercentFormatter.format(value * 100)}%`;
+}
+
 function formatProfitWithRate(profitLoss, costBasis) {
   if (costBasis <= 0) {
     return formatSignedCurrency(profitLoss);
   }
 
   return `${formatSignedCurrency(profitLoss)} (${formatSignedPercent(profitLoss / costBasis)})`;
+}
+
+function formatHoldingProfitWithRate(profitLoss, profitRate, currency = "KRW") {
+  return `${formatSignedHoldingMoney(profitLoss, currency)}(${formatSignedPercentCompact(profitRate)})`;
+}
+
+function formatProfitWithRateCompact(profitLoss, profitRate) {
+  return `${formatSignedCurrency(profitLoss)}(${formatSignedPercentCompact(profitRate)})`;
 }
 
 function formatCashBreakdown(cashKrw, cashUsd) {
@@ -683,6 +734,16 @@ async function fetchLocalLivePrices() {
   return normalizeLivePriceSource(payload, "deployed-file");
 }
 
+async function fetchDividendData() {
+  const payload = await fetchJson(DIVIDENDS_URL);
+
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("Invalid dividend payload");
+  }
+
+  return payload;
+}
+
 async function fetchGitHubLivePrices() {
   const payload = await fetchJson(GITHUB_LIVE_PRICES_URL, {
     headers: {
@@ -778,7 +839,7 @@ function renderCurrentBook() {
     return;
   }
 
-  renderApp(buildBookData(state.portfolioSource, state.livePriceSource));
+  renderApp(buildBookData(state.portfolioSource, state.livePriceSource, state.dividendSource));
 }
 
 function getUsdKrwRate(source, quotes) {
@@ -799,7 +860,7 @@ function convertToBaseCurrency(value, currency, usdKrwRate) {
   return currency === "USD" ? value * usdKrwRate : value;
 }
 
-function buildPortfolioData(source, livePriceSource) {
+function buildPortfolioData(source, livePriceSource, dividendSource) {
   const quotes = livePriceSource?.quotes ?? {};
   const isFallbackSource = livePriceSource?.provider === "snapshot-fallback";
   const hasAutomaticQuotes = isAutomaticLivePriceSource(livePriceSource);
@@ -820,6 +881,13 @@ function buildPortfolioData(source, livePriceSource) {
     const marketValueBase = convertToBaseCurrency(marketValue, currency, usdKrwRate);
     const costBasisBase = convertToBaseCurrency(holding.costBasis, currency, usdKrwRate);
     const profitLossBase = marketValueBase - costBasisBase;
+    const annualDividendPerShare = getAnnualDividendPerShare(dividendSource, holding);
+    const annualDividendIncome = annualDividendPerShare * holding.quantity;
+    const annualDividendIncomeBase = convertToBaseCurrency(
+      annualDividendIncome,
+      currency,
+      usdKrwRate,
+    );
     const profitRate = holding.costBasis === 0 ? 0 : profitLoss / holding.costBasis;
 
     return {
@@ -832,6 +900,9 @@ function buildPortfolioData(source, livePriceSource) {
       costBasisBase,
       profitLoss,
       profitLossBase,
+      annualDividendPerShare,
+      annualDividendIncome,
+      annualDividendIncomeBase,
       profitRate,
       averageCost: holding.costBasis / holding.quantity,
       priceSource: holding.manualPriceOnly
@@ -850,6 +921,7 @@ function buildPortfolioData(source, livePriceSource) {
       accumulator.marketValue += holding.marketValueBase;
       accumulator.costBasis += holding.costBasisBase;
       accumulator.profitLoss += holding.profitLossBase;
+      accumulator.annualDividendIncome += holding.annualDividendIncomeBase;
       return accumulator;
     },
     {
@@ -857,6 +929,7 @@ function buildPortfolioData(source, livePriceSource) {
       marketValue: 0,
       costBasis: 0,
       profitLoss: 0,
+      annualDividendIncome: 0,
     },
   );
 
@@ -890,9 +963,9 @@ function buildPortfolioData(source, livePriceSource) {
   };
 }
 
-function buildBookData(source, livePriceSource) {
+function buildBookData(source, livePriceSource, dividendSource) {
   const portfolios = source.accounts.map((account) =>
-    buildPortfolioData(account, livePriceSource)
+    buildPortfolioData(account, livePriceSource, dividendSource)
   );
 
   const overview = portfolios.reduce(
@@ -904,6 +977,7 @@ function buildBookData(source, livePriceSource) {
       accumulator.cash += portfolio.cashBase;
       accumulator.cashKrw += portfolio.cash;
       accumulator.cashUsd += portfolio.cashUsd;
+      accumulator.annualDividendIncome += portfolio.totals.annualDividendIncome;
       accumulator.holdingsCount += portfolio.holdings.length;
       return accumulator;
     },
@@ -915,6 +989,7 @@ function buildBookData(source, livePriceSource) {
       cash: 0,
       cashKrw: 0,
       cashUsd: 0,
+      annualDividendIncome: 0,
       holdingsCount: 0,
     },
   );
@@ -1026,12 +1101,14 @@ function buildTreemapData(book) {
         marketValueBase: 0,
         costBasisBase: 0,
         profitLossBase: 0,
+        annualDividendIncomeBase: 0,
         accountNames: new Set(),
       };
 
       existingAsset.marketValueBase += holding.marketValueBase;
       existingAsset.costBasisBase += holding.costBasisBase;
       existingAsset.profitLossBase += holding.profitLossBase;
+      existingAsset.annualDividendIncomeBase += holding.annualDividendIncomeBase;
       existingAsset.accountNames.add(portfolio.name);
       assetMap.set(key, existingAsset);
     });
@@ -1046,6 +1123,7 @@ function buildTreemapData(book) {
         marketValueBase: 0,
         costBasisBase: 0,
         profitLossBase: 0,
+        annualDividendIncomeBase: 0,
         accountNames: new Set(),
       };
 
@@ -1065,6 +1143,7 @@ function buildTreemapData(book) {
         marketValueBase: 0,
         costBasisBase: 0,
         profitLossBase: 0,
+        annualDividendIncomeBase: 0,
         accountNames: new Set(),
       };
 
@@ -1104,6 +1183,7 @@ function buildTreemapData(book) {
       marketValueBase: 0,
       costBasisBase: 0,
       profitLossBase: 0,
+      annualDividendIncomeBase: 0,
       categories: new Map(),
     };
     const existingCategory = existingSuperCategory.categories.get(asset.category) ?? {
@@ -1113,16 +1193,19 @@ function buildTreemapData(book) {
       marketValueBase: 0,
       costBasisBase: 0,
       profitLossBase: 0,
+      annualDividendIncomeBase: 0,
       assets: [],
     };
 
     existingCategory.marketValueBase += asset.marketValueBase;
     existingCategory.costBasisBase += asset.costBasisBase;
     existingCategory.profitLossBase += asset.profitLossBase;
+    existingCategory.annualDividendIncomeBase += asset.annualDividendIncomeBase;
     existingCategory.assets.push(asset);
     existingSuperCategory.marketValueBase += asset.marketValueBase;
     existingSuperCategory.costBasisBase += asset.costBasisBase;
     existingSuperCategory.profitLossBase += asset.profitLossBase;
+    existingSuperCategory.annualDividendIncomeBase += asset.annualDividendIncomeBase;
     existingSuperCategory.categories.set(asset.category, existingCategory);
     superCategoryMap.set(asset.superCategory, existingSuperCategory);
   });
@@ -1150,6 +1233,7 @@ function buildTreemapData(book) {
         id: superCategory.id,
         name: superCategory.name,
         marketValueBase: superCategory.marketValueBase,
+        annualDividendIncomeBase: superCategory.annualDividendIncomeBase,
         weight: superCategory.marketValueBase / book.overview.totalAssets,
         categories,
       };
@@ -1807,9 +1891,7 @@ function renderTreemapSuperCategoryTile(layout) {
   `;
 }
 
-function renderTreemapSection(book) {
-  const treemap = buildTreemapData(book);
-
+function renderTreemapSection(treemap) {
   if (!treemap || !treemap.superCategories.length) {
     return "";
   }
@@ -1823,15 +1905,12 @@ function renderTreemapSection(book) {
   );
 
   return `
-    <section class="treemap-card">
-      <div class="section-head">
-        <div>
-          <h2 class="section-title">Portfolio</h2>
-        </div>
-      </div>
-
-      ${renderPortfolioCircleChart(treemap)}
-
+    <section
+      class="treemap-card sidebar-anchor-section"
+      id="dashboard-treemap"
+      data-nav-section
+      aria-label="Treemap"
+    >
       <div class="treemap-wrap">
         <div class="treemap-canvas">
           ${superCategoryLayouts.map(renderTreemapSuperCategoryTile).join("")}
@@ -1843,13 +1922,6 @@ function renderTreemapSection(book) {
             <span class="treemap-hover-weight"></span>
           </div>
         </div>
-      </div>
-
-      <div class="treemap-footnote">
-        <span>원형 차트 = 요청한 8개 묶음</span>
-        <span>면적 = KRW 환산 평가금액</span>
-        <span>중복 보유 = 계좌별 합산</span>
-        <span>현금 = 원화 현금 타일로 별도 집계</span>
       </div>
     </section>
   `;
@@ -1962,8 +2034,8 @@ function renderSummaryCards(portfolio) {
       label: "현금",
       value: formatCurrency(portfolio.cashBase),
       detail: portfolio.cashUsd > 0 && cashBreakdown
-        ? `${cashBreakdown} · 총자산 비중 ${formatPercent(portfolio.totals.cashWeight)}`
-        : `총자산 비중 ${formatPercent(portfolio.totals.cashWeight)}`,
+        ? `${cashBreakdown} · 비중 ${formatPercent(portfolio.totals.cashWeight)}`
+        : `비중 ${formatPercent(portfolio.totals.cashWeight)}`,
       tone: "",
     },
     {
@@ -2039,43 +2111,6 @@ function getTopHoldings(portfolio, limit = 3) {
     .slice(0, limit);
 }
 
-function renderAccountOverviewCards(book) {
-  return book.portfolios
-    .map((portfolio) => {
-      return `
-        <article class="overview-card">
-          <div class="overview-card-head">
-            <div>
-              <p class="overview-card-label">${portfolio.name}</p>
-              <h3 class="overview-card-total">${formatCurrency(portfolio.totals.totalAssets)}</h3>
-            </div>
-            <a class="overview-card-link" href="#${portfolio.id}">상세 보기</a>
-          </div>
-
-          <div class="overview-metric-grid">
-            <div class="overview-metric">
-              <span>평가손익</span>
-              <strong class="${getToneClass(portfolio.totals.profitLoss)}">${formatSignedCurrency(portfolio.totals.profitLoss)}</strong>
-            </div>
-            <div class="overview-metric">
-              <span>수익률</span>
-              <strong class="${getToneClass(portfolio.totals.totalReturn)}">${formatSignedPercent(portfolio.totals.totalReturn)}</strong>
-            </div>
-            <div class="overview-metric">
-              <span>현금</span>
-              <strong>${formatCurrency(portfolio.cashBase)}</strong>
-            </div>
-            <div class="overview-metric">
-              <span>보유 종목</span>
-              <strong>${currencyFormatter.format(portfolio.holdings.length)}개</strong>
-            </div>
-          </div>
-        </article>
-      `;
-    })
-    .join("");
-}
-
 function getAggregatePriceSource(priceSources) {
   const uniqueSources = [...new Set(priceSources.filter(Boolean))];
 
@@ -2093,6 +2128,47 @@ function getAggregatePriceSource(priceSources) {
 function buildAggregatedHoldings(book) {
   const aggregatedHoldings = new Map();
 
+  const upsertCashHolding = ({
+    key,
+    ticker,
+    name,
+    currency,
+    amount,
+    amountBase,
+    accountName,
+  }) => {
+    if (amount <= 0) {
+      return;
+    }
+
+    const existingHolding = aggregatedHoldings.get(key) ?? {
+      ticker,
+      name,
+      type: "현금",
+      currency,
+      quantity: 0,
+      marketValue: 0,
+      marketValueBase: 0,
+      costBasis: 0,
+      costBasisBase: 0,
+      profitLoss: 0,
+      profitLossBase: 0,
+      annualDividendPerShare: 0,
+      annualDividendIncome: 0,
+      annualDividendIncomeBase: 0,
+      accountNames: new Set(),
+      priceSources: [],
+      nameInferred: false,
+    };
+
+    existingHolding.marketValue += amount;
+    existingHolding.marketValueBase += amountBase;
+    existingHolding.costBasis += amount;
+    existingHolding.costBasisBase += amountBase;
+    existingHolding.accountNames.add(accountName);
+    aggregatedHoldings.set(key, existingHolding);
+  };
+
   book.portfolios.forEach((portfolio) => {
     portfolio.holdings.forEach((holding) => {
       const key = `${holding.currency}:${holding.ticker}`;
@@ -2108,6 +2184,9 @@ function buildAggregatedHoldings(book) {
         costBasisBase: 0,
         profitLoss: 0,
         profitLossBase: 0,
+        annualDividendPerShare: 0,
+        annualDividendIncome: 0,
+        annualDividendIncomeBase: 0,
         accountNames: new Set(),
         priceSources: [],
         nameInferred: false,
@@ -2120,11 +2199,34 @@ function buildAggregatedHoldings(book) {
       existingHolding.costBasisBase += holding.costBasisBase;
       existingHolding.profitLoss += holding.profitLoss;
       existingHolding.profitLossBase += holding.profitLossBase;
+      existingHolding.annualDividendPerShare = holding.annualDividendPerShare;
+      existingHolding.annualDividendIncome += holding.annualDividendIncome;
+      existingHolding.annualDividendIncomeBase += holding.annualDividendIncomeBase;
       existingHolding.accountNames.add(portfolio.name);
       existingHolding.priceSources.push(holding.priceSource);
       existingHolding.nameInferred ||= holding.nameInferred;
 
       aggregatedHoldings.set(key, existingHolding);
+    });
+
+    upsertCashHolding({
+      key: "KRW:KRW",
+      ticker: "KRW",
+      name: "현금(KRW)",
+      currency: "KRW",
+      amount: portfolio.cash,
+      amountBase: portfolio.cash,
+      accountName: portfolio.name,
+    });
+
+    upsertCashHolding({
+      key: "USD:USD",
+      ticker: "USD",
+      name: "현금(USD)",
+      currency: "USD",
+      amount: portfolio.cashUsd,
+      amountBase: convertToBaseCurrency(portfolio.cashUsd, "USD", portfolio.usdKrwRate),
+      accountName: portfolio.name,
     });
   });
 
@@ -2133,26 +2235,18 @@ function buildAggregatedHoldings(book) {
       ...holding,
       accountNames: [...holding.accountNames],
       accountCount: holding.accountNames.size,
-      currentPrice: holding.quantity === 0 ? 0 : holding.marketValue / holding.quantity,
-      averageCost: holding.quantity === 0 ? 0 : holding.costBasis / holding.quantity,
-      profitRate: holding.costBasis === 0 ? 0 : holding.profitLoss / holding.costBasis,
+      currentPrice: holding.type === "현금" || holding.quantity === 0 ? null : holding.marketValue / holding.quantity,
+      averageCost: holding.type === "현금" || holding.quantity === 0 ? null : holding.costBasis / holding.quantity,
+      profitRate: holding.type === "현금" || holding.costBasis === 0 ? 0 : holding.profitLoss / holding.costBasis,
       assetWeight:
         book.overview.totalAssets === 0 ? 0 : holding.marketValueBase / book.overview.totalAssets,
-      priceSource: getAggregatePriceSource(holding.priceSources),
+      priceSource: holding.type === "현금" ? "cash" : getAggregatePriceSource(holding.priceSources),
     }))
     .sort(
       (left, right) =>
         right.marketValueBase - left.marketValueBase ||
         left.name.localeCompare(right.name, "ko-KR"),
     );
-}
-
-function formatAggregatedHoldingNote(holding) {
-  if (holding.accountCount <= 1) {
-    return "-";
-  }
-
-  return `${holding.accountNames.join(", ")} 합산`;
 }
 
 function resolvePortfolioCircleGroup(category) {
@@ -2203,7 +2297,7 @@ function buildPortfolioCircleGroups(treemap) {
 
       group.marketValueBase += category.marketValueBase;
       group.costBasisBase += category.costBasisBase;
-      group.dividendIncomeBase += category.marketValueBase * PORTFOLIO_DIVIDEND_YIELD_ASSUMPTION;
+      group.dividendIncomeBase += category.annualDividendIncomeBase;
       group.profitLossBase += category.profitLossBase;
       group.members.add(category.name);
 
@@ -2250,7 +2344,6 @@ function buildPortfolioCircleGroups(treemap) {
         ...resolvedGroup,
         members,
         detail,
-        dividendWeightText: "-",
         weight:
           treemap.totalAssets === 0 ? 0 : resolvedGroup.marketValueBase / treemap.totalAssets,
       };
@@ -2341,6 +2434,8 @@ function renderPortfolioCircleChart(treemap) {
   const segments = buildPortfolioCircleSegments(sortedGroups);
   const totalCostBasis = sortedGroups.reduce((sum, group) => sum + group.costBasisBase, 0);
   const totalDividendIncome = sortedGroups.reduce((sum, group) => sum + group.dividendIncomeBase, 0);
+  const totalDividendYield =
+    treemap.totalAssets === 0 ? 0 : totalDividendIncome / treemap.totalAssets;
   const totalProfitLoss = sortedGroups.reduce((sum, group) => sum + group.profitLossBase, 0);
   const totalReturn = totalCostBasis === 0 ? 0 : totalProfitLoss / totalCostBasis;
   const valueChartAriaLabel = sortedGroups
@@ -2356,7 +2451,12 @@ function renderPortfolioCircleChart(treemap) {
     .join(", ");
 
   return `
-    <article class="portfolio-circle-card">
+    <section
+      class="portfolio-circle-card sidebar-anchor-section"
+      id="dashboard-overview"
+      data-nav-section
+      aria-label="Overview"
+    >
       <div class="portfolio-circle-layout">
         <div class="portfolio-circle-visual">
           ${renderPortfolioCirclePlot({
@@ -2370,7 +2470,7 @@ function renderPortfolioCircleChart(treemap) {
             chartLabel: `포트폴리오 연간 배당 원형 차트: ${dividendChartAriaLabel}`,
             segments: dividendSegments,
             summaryValue: formatCurrency(totalDividendIncome),
-            summaryNote: `연 ${formatPercent(PORTFOLIO_DIVIDEND_YIELD_ASSUMPTION)} 가정`,
+            summaryNote: `배당률 ${formatPercent(totalDividendYield)}`,
           })}
         </div>
 
@@ -2379,8 +2479,8 @@ function renderPortfolioCircleChart(treemap) {
             <div class="portfolio-circle-table-head">
               <span>카테고리</span>
               <span>평가금액</span>
-              <span>매수금액 / 손익</span>
-              <span>비중</span>
+              <span>연 배당</span>
+              <span>비중(금액/배당)</span>
             </div>
 
             <div class="portfolio-circle-list">
@@ -2397,13 +2497,14 @@ function renderPortfolioCircleChart(treemap) {
                       </div>
                       <div class="portfolio-circle-cell portfolio-circle-value">
                         <strong>${formatCurrency(group.marketValueBase)}</strong>
+                        <span class="portfolio-circle-value-sub ${getToneClass(group.profitLossBase)}">${formatProfitWithRate(group.profitLossBase, group.costBasisBase)}</span>
                       </div>
-                      <div class="portfolio-circle-cell portfolio-circle-profit">
-                        <strong>${formatCurrency(group.costBasisBase)}</strong>
-                        <span class="${getToneClass(group.profitLossBase)}">${formatProfitWithRate(group.profitLossBase, group.costBasisBase)}</span>
+                      <div class="portfolio-circle-cell portfolio-circle-dividend">
+                        <strong>${formatCurrency(group.dividendIncomeBase)}</strong>
+                        <span class="portfolio-circle-dividend-sub">${formatPercent(group.marketValueBase === 0 ? 0 : group.dividendIncomeBase / group.marketValueBase)}</span>
                       </div>
                       <div class="portfolio-circle-cell portfolio-circle-weight">
-                        <strong>${formatPercent(group.weight)}</strong>
+                        <strong>${formatPercent(group.weight)} / ${formatPercent(totalDividendIncome === 0 ? 0 : group.dividendIncomeBase / totalDividendIncome)}</strong>
                       </div>
                     </div>
                   `,
@@ -2417,19 +2518,20 @@ function renderPortfolioCircleChart(treemap) {
               </div>
               <div class="portfolio-circle-cell portfolio-circle-value">
                 <strong>${formatCurrency(treemap.totalAssets)}</strong>
+                <span class="portfolio-circle-value-sub ${getToneClass(totalProfitLoss)}">${formatProfitWithRate(totalProfitLoss, totalCostBasis)}</span>
               </div>
-              <div class="portfolio-circle-cell portfolio-circle-profit">
-                <strong>${formatCurrency(totalCostBasis)}</strong>
-                <span class="${getToneClass(totalProfitLoss)}">${formatProfitWithRate(totalProfitLoss, totalCostBasis)}</span>
+              <div class="portfolio-circle-cell portfolio-circle-dividend">
+                <strong>${formatCurrency(totalDividendIncome)}</strong>
+                <span class="portfolio-circle-dividend-sub">${formatPercent(treemap.totalAssets === 0 ? 0 : totalDividendIncome / treemap.totalAssets)}</span>
               </div>
               <div class="portfolio-circle-cell portfolio-circle-weight">
-                <strong>${formatPercent(1)}</strong>
+                <strong>${formatPercent(1)} / ${formatPercent(1)}</strong>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </article>
+    </section>
   `;
 }
 
@@ -2530,29 +2632,40 @@ function hydrateTreemapInteractions() {
   });
 }
 
-function renderAllHoldingsRows(book) {
-  return buildAggregatedHoldings(book)
+function renderAllHoldingsRows(holdings) {
+  return holdings
     .map(
-      (holding) => `
+      (holding) => {
+        const isCash = holding.type === "현금";
+
+        return `
         <tr>
           <td>
             <div class="asset-name">${holding.name}</div>
           </td>
-          <td>${formatQuantity(holding.quantity)}</td>
+          <td>${isCash ? "-" : formatQuantity(holding.quantity)}</td>
           <td>
-            <div class="metric">
-              <strong>${formatPrice(holding.currentPrice, holding.currency)}</strong>
+            ${isCash
+              ? "-"
+              : `
+                <div class="metric">
+                  <strong>${formatOverallMoney(holding.currentPrice, holding.currency)}</strong>
+                </div>
+              `}
+          </td>
+          <td>${isCash ? "-" : formatOverallAverageCost(holding.averageCost, holding.currency)}</td>
+          <td>
+            <div class="all-holdings-value-stack">
+              <strong>${formatOverallMoney(holding.marketValue, holding.currency)}</strong>
+              <span class="all-holdings-value-sub ${isCash ? "" : getToneClass(holding.profitLoss)}">${isCash ? "-" : formatOverallProfitWithRate(holding.profitLoss, holding.profitRate, holding.currency)}</span>
             </div>
           </td>
-          <td>${formatAverageCost(holding.averageCost, holding.currency)}</td>
-          <td>${formatHoldingMoney(holding.costBasis, holding.currency)}</td>
-          <td>${formatHoldingMoney(holding.marketValue, holding.currency)}</td>
-          <td class="${getToneClass(holding.profitLoss)}">${formatSignedHoldingMoney(holding.profitLoss, holding.currency)}</td>
-          <td class="${getToneClass(holding.profitRate)}">${formatSignedPercent(holding.profitRate)}</td>
+          <td>${isCash ? "-" : formatOverallMoney(holding.annualDividendPerShare, holding.currency)}</td>
+          <td>${isCash ? "-" : formatOverallMoney(holding.annualDividendIncome, holding.currency)}</td>
           <td>${formatPercent(holding.assetWeight)}</td>
-          <td>${formatAggregatedHoldingNote(holding)}</td>
         </tr>
-      `,
+      `;
+      },
     )
     .join("");
 }
@@ -2592,18 +2705,41 @@ function renderTableRows(portfolio) {
 }
 
 function renderAllHoldingsSection(book) {
-  const uniqueHoldingsCount = buildAggregatedHoldings(book).length;
+  const aggregatedHoldings = buildAggregatedHoldings(book);
+  const uniqueHoldingsCount = aggregatedHoldings.length;
+  const aggregatedCostBasis = aggregatedHoldings.reduce(
+    (total, holding) => total + holding.costBasisBase,
+    0,
+  );
+  const aggregatedMarketValue = aggregatedHoldings.reduce(
+    (total, holding) => total + holding.marketValueBase,
+    0,
+  );
+  const aggregatedProfitLoss = aggregatedHoldings.reduce(
+    (total, holding) => total + holding.profitLossBase,
+    0,
+  );
+  const aggregatedAnnualDividendIncome = aggregatedHoldings.reduce(
+    (total, holding) => total + holding.annualDividendIncomeBase,
+    0,
+  );
+  const aggregatedProfitRate =
+    aggregatedCostBasis === 0 ? 0 : aggregatedProfitLoss / aggregatedCostBasis;
 
   return `
-    <section class="table-card all-holdings-card">
+    <section
+      class="table-card all-holdings-card sidebar-anchor-section"
+      id="all-holdings"
+      data-nav-section
+    >
       <div class="section-head">
         <div>
-          <h2 class="section-title">종목별 전체 합산 표</h2>
+          <h2 class="section-title">Overall</h2>
           <p class="section-copy">
-            같은 종목을 여러 계좌에서 보유 중이면 한 줄로 합산했습니다. 수량, 매입금액, 평가금액, 손익은 종목 기준으로 합치고, 여러 계좌 보유 여부는 비고에서 확인할 수 있습니다.
+            같은 종목을 여러 계좌에서 보유 중이면 한 줄로 합산했고, 현금(KRW, USD)도 함께 포함했습니다. 수량, 평가금액, 손익은 종목 기준으로 합치고, 배당(주당)과 연배당은 최근 1년 배당 기준으로 계산했습니다.
           </p>
         </div>
-        <div class="section-pill">중복 합산 후 ${currencyFormatter.format(uniqueHoldingsCount)}종목</div>
+        <div class="section-pill">중복 합산 후 ${currencyFormatter.format(uniqueHoldingsCount)}개 자산</div>
       </div>
 
       <div class="table-wrap">
@@ -2614,29 +2750,30 @@ function renderAllHoldingsSection(book) {
               <th>수량</th>
               <th>현재가</th>
               <th>평균단가</th>
-              <th>매입금액</th>
               <th>평가금액</th>
-              <th>평가손익</th>
-              <th>수익률</th>
-              <th>전체 비중</th>
-              <th>비고</th>
+              <th>배당/1주</th>
+              <th>연배당</th>
+              <th>비중</th>
             </tr>
           </thead>
           <tbody>
-            ${renderAllHoldingsRows(book)}
+            ${renderAllHoldingsRows(aggregatedHoldings)}
           </tbody>
           <tfoot>
             <tr>
-              <td>합계 (원화 환산)</td>
+              <td>합계 (현금 포함, 원화 환산)</td>
               <td>-</td>
               <td>-</td>
               <td>-</td>
-              <td>${formatCurrency(book.overview.costBasis)}</td>
-              <td>${formatCurrency(book.overview.marketValue)}</td>
-              <td class="${getToneClass(book.overview.profitLoss)}">${formatSignedCurrency(book.overview.profitLoss)}</td>
-              <td class="${getToneClass(book.overview.totalReturn)}">${formatSignedPercent(book.overview.totalReturn)}</td>
-              <td>${formatPercent(book.overview.totalAssets === 0 ? 0 : book.overview.marketValue / book.overview.totalAssets)}</td>
-              <td>현금 제외 보유 종목 합산</td>
+              <td>
+                <div class="all-holdings-value-stack">
+                  <strong>${formatCurrency(aggregatedMarketValue)}</strong>
+                  <span class="all-holdings-value-sub ${getToneClass(aggregatedProfitLoss)}">${formatProfitWithRateCompact(aggregatedProfitLoss, aggregatedProfitRate)}</span>
+                </div>
+              </td>
+              <td>-</td>
+              <td>${formatCurrency(aggregatedAnnualDividendIncome)}</td>
+              <td>${formatPercent(book.overview.totalAssets === 0 ? 0 : aggregatedMarketValue / book.overview.totalAssets)}</td>
             </tr>
           </tfoot>
         </table>
@@ -2654,7 +2791,11 @@ function renderPortfolioSection(portfolio) {
     : "수량과 매입금액은 고정 원장 데이터입니다. 현재가, 평가금액, 손익, 수익률은 최신 시세 기준으로 다시 계산됩니다.";
 
   return `
-    <section class="account-stack" id="${portfolio.id}">
+    <section
+      class="account-stack sidebar-anchor-section"
+      id="${portfolio.id}"
+      data-nav-section
+    >
       <section class="hero">
         <div class="eyebrow">Account Detail</div>
         <div class="hero-head">
@@ -2690,7 +2831,7 @@ function renderPortfolioSection(portfolio) {
                 <th>평가금액</th>
                 <th>평가손익</th>
                 <th>수익률</th>
-                <th>총자산 비중</th>
+                <th>비중</th>
               </tr>
             </thead>
             <tbody>
@@ -2749,6 +2890,154 @@ function renderError(error) {
   `;
 }
 
+function renderSidebarNavigation(book) {
+  return `
+    <aside class="dashboard-sidebar">
+      <div class="sidebar-nav-card">
+        <div class="sidebar-nav-brand">
+          <span class="sidebar-nav-brand-mark">2</span>
+          <div>
+            <strong>Portfolio</strong>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav-groups" aria-label="페이지 메뉴">
+          <div class="sidebar-nav-group">
+            <p class="sidebar-nav-group-label">Dashboard</p>
+            <div class="sidebar-nav-subgroup">
+              <a
+                class="sidebar-nav-link is-subitem is-active"
+                href="#dashboard-overview"
+                data-section-link
+                data-section-target="dashboard-overview"
+              >
+                <span>Overview</span>
+              </a>
+              <a
+                class="sidebar-nav-link is-subitem"
+                href="#dashboard-treemap"
+                data-section-link
+                data-section-target="dashboard-treemap"
+              >
+                <span>Treemap</span>
+              </a>
+              <a
+                class="sidebar-nav-link is-subitem"
+                href="#all-holdings"
+                data-section-link
+                data-section-target="all-holdings"
+              >
+                <span>Overall</span>
+              </a>
+            </div>
+          </div>
+
+          <div class="sidebar-nav-group">
+            <p class="sidebar-nav-group-label">Accounts</p>
+            <a
+              class="sidebar-nav-link"
+              href="#account-details"
+              data-section-link
+              data-section-target="account-details"
+            >
+              <span class="sidebar-nav-link-kicker">2</span>
+              <span>계좌별 상세</span>
+            </a>
+
+            <div class="sidebar-nav-subgroup">
+              ${book.portfolios
+                .map(
+                  (portfolio) => `
+                    <a
+                      class="sidebar-nav-link is-subitem"
+                      href="#${portfolio.id}"
+                      data-section-link
+                      data-section-target="${portfolio.id}"
+                    >
+                      <span>${portfolio.name}</span>
+                    </a>
+                  `,
+                )
+                .join("")}
+            </div>
+          </div>
+        </nav>
+      </div>
+    </aside>
+  `;
+}
+
+function setSidebarActiveSection(sectionId) {
+  if (!sectionId) {
+    return;
+  }
+
+  document.querySelectorAll("[data-section-link]").forEach((link) => {
+    link.classList.toggle("is-active", link.dataset.sectionTarget === sectionId);
+  });
+}
+
+function hydrateSidebarNavigation() {
+  if (sidebarSectionObserver) {
+    sidebarSectionObserver.disconnect();
+    sidebarSectionObserver = null;
+  }
+
+  const links = [...document.querySelectorAll("[data-section-link]")];
+
+  if (!links.length) {
+    return;
+  }
+
+  const sectionIds = [...new Set(links.map((link) => link.dataset.sectionTarget).filter(Boolean))];
+  const sections = sectionIds.map((id) => document.getElementById(id)).filter(Boolean);
+
+  links.forEach((link) => {
+    if (link.dataset.sidebarBound === "true") {
+      return;
+    }
+
+    link.dataset.sidebarBound = "true";
+    link.addEventListener("click", () => {
+      setSidebarActiveSection(link.dataset.sectionTarget);
+    });
+  });
+
+  if (!sections.length) {
+    return;
+  }
+
+  const visibleSections = new Map();
+  sidebarSectionObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          visibleSections.set(entry.target.id, Math.abs(entry.boundingClientRect.top));
+          return;
+        }
+
+        visibleSections.delete(entry.target.id);
+      });
+
+      const nextSectionId = [...visibleSections.entries()].sort((left, right) => left[1] - right[1])[0]?.[0];
+
+      if (nextSectionId) {
+        setSidebarActiveSection(nextSectionId);
+      }
+    },
+    {
+      rootMargin: "-18% 0px -64% 0px",
+      threshold: [0, 0.15, 0.4],
+    },
+  );
+
+  sections.forEach((section) => {
+    sidebarSectionObserver.observe(section);
+  });
+
+  setSidebarActiveSection(sections[0].id);
+}
+
 function renderApp(book) {
   const app = document.querySelector("#app");
 
@@ -2757,54 +3046,62 @@ function renderApp(book) {
   }
 
   const marketStatus = buildMarketStatus(book);
+  const treemap = buildTreemapData(book);
 
   app.innerHTML = `
-    <section class="dashboard">
-      <section class="overview-section">
-        <div class="hero-toolbar dashboard-toolbar">
-          <div class="market-status ${marketStatus.tone}">
-            <span class="status-dot"></span>
-            <div>
-              <strong>${marketStatus.title}</strong>
-              <span>${marketStatus.detail}</span>
-              ${marketStatus.note ? `<span>${marketStatus.note}</span>` : ""}
+    <section class="dashboard-shell">
+      ${renderSidebarNavigation(book)}
+
+      <section class="dashboard-main">
+        <section class="dashboard">
+          <section class="overview-section">
+            <div class="hero-toolbar dashboard-toolbar">
+              <div class="market-status ${marketStatus.tone}">
+                <span class="status-dot"></span>
+                <div>
+                  <strong>${marketStatus.title}</strong>
+                  <span>${marketStatus.detail}</span>
+                  ${marketStatus.note ? `<span>${marketStatus.note}</span>` : ""}
+                </div>
+              </div>
+              <div class="toolbar-actions">
+                <button class="ghost-button" data-refresh-quotes ${state.isRefreshing ? "disabled" : ""}>
+                  ${state.isRefreshing ? "시세 불러오는 중..." : "시세 다시 불러오기"}
+                </button>
+              </div>
             </div>
-          </div>
-          <div class="toolbar-actions">
-            <button class="ghost-button" data-refresh-quotes ${state.isRefreshing ? "disabled" : ""}>
-              ${state.isRefreshing ? "시세 불러오는 중..." : "시세 다시 불러오기"}
-            </button>
-          </div>
-        </div>
+          </section>
 
-        ${renderTreemapSection(book)}
+          ${renderPortfolioCircleChart(treemap)}
 
-        <div class="overview-layout overview-layout-full">
-          <div class="overview-grid">
-            ${renderAccountOverviewCards(book)}
-          </div>
-        </div>
-      </section>
+          ${renderTreemapSection(treemap)}
 
-      ${renderAllHoldingsSection(book)}
+          ${renderAllHoldingsSection(book)}
 
-      <section class="detail-section">
-        <div class="section-head detail-head">
-          <div>
-            <h2 class="section-title">계좌 상세</h2>
-            <p class="section-copy">
-              각 계좌의 원장 기준 수량과 평단, 그리고 최신 현재가 기준 평가금액과 손익을 상세 표로 확인합니다.
-            </p>
-          </div>
-        </div>
+          <section
+            class="detail-section sidebar-anchor-section"
+            id="account-details"
+            data-nav-section
+          >
+            <div class="section-head detail-head">
+              <div>
+                <h2 class="section-title">계좌 상세</h2>
+                <p class="section-copy">
+                  각 계좌의 원장 기준 수량과 평단, 그리고 최신 현재가 기준 평가금액과 손익을 상세 표로 확인합니다.
+                </p>
+              </div>
+            </div>
 
-        <div class="account-stack-list">
-          ${book.portfolios.map(renderPortfolioSection).join("")}
-        </div>
+            <div class="account-stack-list">
+              ${book.portfolios.map(renderPortfolioSection).join("")}
+            </div>
+          </section>
+        </section>
       </section>
     </section>
   `;
 
+  hydrateSidebarNavigation();
   hydratePortfolioCircleInteractions();
   hydrateTreemapInteractions();
   scheduleTreemapTypographyFit();
@@ -2858,7 +3155,10 @@ async function initializeApp() {
   renderLoading();
 
   try {
-    state.portfolioSource = await fetchJson(PORTFOLIOS_URL);
+    [state.portfolioSource, state.dividendSource] = await Promise.all([
+      fetchJson(PORTFOLIOS_URL),
+      fetchDividendData(),
+    ]);
     const externalTickers = getExternalQuoteTickers(state.portfolioSource);
 
     try {
@@ -2871,7 +3171,7 @@ async function initializeApp() {
       state.refreshError = error;
     }
 
-    renderApp(buildBookData(state.portfolioSource, state.livePriceSource));
+    renderApp(buildBookData(state.portfolioSource, state.livePriceSource, state.dividendSource));
     startAutoRefresh();
   } catch (error) {
     renderError(error);
