@@ -5,7 +5,7 @@
   "accounts": [
     {
       "id": "pension-savings-1",
-      "name": "연금저축1",
+      "name": "연금저축(세액공제)",
       "snapshotLabel": "2026년 3월 9일 20:38 스크린샷 기준",
       "cash": 16157,
       "holdings": [
@@ -29,7 +29,7 @@
     },
     {
       "id": "pension-savings-2",
-      "name": "연금저축2",
+      "name": "연금저축(세액미공제)",
       "snapshotLabel": "2026년 3월 9일 20:22 스크린샷 기준",
       "cash": 94647,
       "holdings": [

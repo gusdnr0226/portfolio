@@ -29,6 +29,45 @@ const TREEMAP_LAYOUT_ORDER_GLOBAL = [
   "MM",
   "기타",
 ];
+const ACCOUNT_SUMMARY_GROUPS = [
+  {
+    key: "direct-investment",
+    label: "직투계좌",
+    color: "#6fa9d8",
+  },
+  {
+    key: "isa",
+    label: "ISA",
+    color: "#5ca893",
+  },
+  {
+    key: "pension-savings-deductible",
+    label: "연금저축(세액공제)",
+    color: "#d3a15e",
+  },
+  {
+    key: "pension-savings-non-deductible",
+    label: "연금저축(세액미공제)",
+    color: "#d28797",
+  },
+  {
+    key: "retirement-pension",
+    label: "퇴직연금",
+    color: "#7e93ae",
+  },
+];
+const PORTFOLIO_DISPLAY_ORDER = [
+  "direct-investment",
+  "isa",
+  "pension-savings-1",
+  "pension-savings-ingyeong",
+  "pension-savings-2",
+  "retirement-pension-hyeonuk",
+  "retirement-pension-ingyeong",
+];
+const portfolioDisplayOrderLookup = new Map(
+  PORTFOLIO_DISPLAY_ORDER.map((id, index) => [id, index]),
+);
 const CATEGORY_TICKER_RULES = {
   "SCHD": [
     "SCHD",
@@ -383,6 +422,14 @@ function formatOverallAverageCost(value, currency = "KRW") {
 
 function formatOverallProfitWithRate(profitLoss, profitRate, currency = "KRW") {
   return `${formatSignedOverallMoney(profitLoss, currency)}(${formatSignedPercentCompact(profitRate)})`;
+}
+
+function formatOverallDividendYield(annualDividendPerShare, currentPrice) {
+  if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+    return "-";
+  }
+
+  return formatPercent(annualDividendPerShare / currentPrice);
 }
 
 function formatAverageCost(value, currency = "KRW") {
@@ -964,9 +1011,14 @@ function buildPortfolioData(source, livePriceSource, dividendSource) {
 }
 
 function buildBookData(source, livePriceSource, dividendSource) {
-  const portfolios = source.accounts.map((account) =>
-    buildPortfolioData(account, livePriceSource, dividendSource)
-  );
+  const portfolios = source.accounts
+    .map((account) => buildPortfolioData(account, livePriceSource, dividendSource))
+    .sort((left, right) => {
+      const leftOrder = portfolioDisplayOrderLookup.get(left.id) ?? Number.MAX_SAFE_INTEGER;
+      const rightOrder = portfolioDisplayOrderLookup.get(right.id) ?? Number.MAX_SAFE_INTEGER;
+
+      return leftOrder - rightOrder || left.name.localeCompare(right.name, "ko-KR");
+    });
 
   const overview = portfolios.reduce(
     (accumulator, portfolio) => {
@@ -1004,6 +1056,80 @@ function buildBookData(source, livePriceSource, dividendSource) {
     portfolios,
     overview,
   };
+}
+
+function resolveAccountSummaryGroup(portfolio) {
+  const name = portfolio?.name ?? "";
+
+  if (portfolio?.id === "direct-investment" || name === "직투계좌") {
+    return "direct-investment";
+  }
+
+  if (portfolio?.id === "isa" || name === "ISA") {
+    return "isa";
+  }
+
+  if (portfolio?.id === "pension-savings-2" || name === "연금저축(세액미공제)") {
+    return "pension-savings-non-deductible";
+  }
+
+  if (portfolio?.id?.startsWith("pension-savings") || name.startsWith("연금저축")) {
+    return "pension-savings-deductible";
+  }
+
+  if (portfolio?.id?.startsWith("retirement-pension") || name.startsWith("퇴직연금")) {
+    return "retirement-pension";
+  }
+
+  return null;
+}
+
+function buildAccountSummaryGroups(book) {
+  const groups = ACCOUNT_SUMMARY_GROUPS.map((group) => ({
+    ...group,
+    totalAssets: 0,
+    costBasis: 0,
+    profitLoss: 0,
+    annualDividendIncome: 0,
+    accounts: [],
+  }));
+  const groupLookup = new Map(groups.map((group) => [group.key, group]));
+
+  book.portfolios.forEach((portfolio) => {
+    const groupKey = resolveAccountSummaryGroup(portfolio);
+
+    if (!groupKey || !groupLookup.has(groupKey)) {
+      return;
+    }
+
+    const group = groupLookup.get(groupKey);
+    group.totalAssets += portfolio.totals.totalAssets;
+    group.costBasis += portfolio.totals.costBasis + portfolio.cashBase;
+    group.profitLoss += portfolio.totals.profitLoss;
+    group.annualDividendIncome += portfolio.totals.annualDividendIncome;
+    group.accounts.push(portfolio.name);
+  });
+
+  const maxAssets = groups.reduce(
+    (maximum, group) => Math.max(maximum, group.totalAssets),
+    0,
+  );
+
+  return groups.map((group) => ({
+    ...group,
+    accountsLabel: group.accounts.join(" + "),
+    dividendTax: group.key === "direct-investment" ? group.annualDividendIncome * 0.15 : 0,
+    netDividendIncome:
+      group.annualDividendIncome -
+      (group.key === "direct-investment" ? group.annualDividendIncome * 0.15 : 0),
+    dividendYield: group.totalAssets === 0 ? 0 : group.annualDividendIncome / group.totalAssets,
+    monthlyNetDividendIncome:
+      (group.annualDividendIncome -
+        (group.key === "direct-investment" ? group.annualDividendIncome * 0.15 : 0)) / 12,
+    profitRate: group.costBasis === 0 ? 0 : group.profitLoss / group.costBasis,
+    weight: book.overview.totalAssets === 0 ? 0 : group.totalAssets / book.overview.totalAssets,
+    barScale: maxAssets === 0 ? 0 : group.totalAssets / maxAssets,
+  }));
 }
 
 function getTreemapCategoryOrder(superCategory, category) {
@@ -2660,7 +2786,16 @@ function renderAllHoldingsRows(holdings) {
               <span class="all-holdings-value-sub ${isCash ? "" : getToneClass(holding.profitLoss)}">${isCash ? "-" : formatOverallProfitWithRate(holding.profitLoss, holding.profitRate, holding.currency)}</span>
             </div>
           </td>
-          <td>${isCash ? "-" : formatOverallMoney(holding.annualDividendPerShare, holding.currency)}</td>
+          <td>
+            ${isCash
+              ? "-"
+              : `
+                <div class="all-holdings-value-stack">
+                  <strong>${formatOverallMoney(holding.annualDividendPerShare, holding.currency)}</strong>
+                  <span class="all-holdings-value-sub">${formatOverallDividendYield(holding.annualDividendPerShare, holding.currentPrice)}</span>
+                </div>
+              `}
+          </td>
           <td>${isCash ? "-" : formatOverallMoney(holding.annualDividendIncome, holding.currency)}</td>
           <td>${formatPercent(holding.assetWeight)}</td>
         </tr>
@@ -2782,6 +2917,80 @@ function renderAllHoldingsSection(book) {
   `;
 }
 
+function renderAccountSummarySection(book) {
+  const groups = buildAccountSummaryGroups(book);
+
+  return `
+    <section
+      class="table-card account-summary-card sidebar-anchor-section"
+      id="account-summary"
+      data-nav-section
+    >
+      <div class="section-head">
+        <div>
+          <h2 class="section-title">계좌 요약</h2>
+          <p class="section-copy">
+            직투계좌, ISA, 연금저축, 퇴직연금을 5개 카테고리로 묶어 총자산과 연배당을 비교합니다. 연금저축(세액미공제)는 별도 분류하고, 나머지 연금저축 계좌는 세액공제로 묶었으며, 직투계좌만 배당소득세 15%를 반영했습니다.
+          </p>
+        </div>
+        <div class="section-pill">총자산 ${formatCurrency(book.overview.totalAssets)}</div>
+      </div>
+
+      <div class="account-summary-wrap">
+        <div class="account-summary-list">
+          ${groups
+            .map(
+              (group) => `
+                <div
+                  class="account-summary-row"
+                  style="--account-summary-color:${group.color}; --account-summary-width:${(group.barScale * 100).toFixed(1)}%;"
+                >
+                  <div class="account-summary-head">
+                    <div class="account-summary-copy">
+                      <strong class="account-summary-name">${group.label}</strong>
+                      <span class="account-summary-meta">${group.accountsLabel || "해당 계좌 없음"}</span>
+                    </div>
+                    <div class="account-summary-stats">
+                      <div class="account-summary-amount-line">
+                        <strong class="account-summary-amount">${formatCurrency(group.totalAssets)}</strong>
+                        <span class="account-summary-profit ${getToneClass(group.profitLoss)}">(${formatSignedCurrency(group.profitLoss)}, ${formatSignedPercentCompact(group.profitRate)})</span>
+                      </div>
+                      <span class="account-summary-share">${formatPercent(group.weight)}</span>
+                    </div>
+                  </div>
+
+                  <div class="account-summary-bar" aria-hidden="true">
+                    <span class="account-summary-bar-fill"></span>
+                  </div>
+
+                  <div class="account-summary-dividend-line">
+                    <span class="account-summary-dividend-item">
+                      <strong>연배당</strong>
+                      <span>${formatCurrency(group.annualDividendIncome)} (${formatPercent(group.dividendYield)})</span>
+                    </span>
+                    <span class="account-summary-dividend-item ${group.dividendTax > 0 ? "is-taxed" : ""}">
+                      <strong>세금</strong>
+                      <span>${group.dividendTax > 0 ? formatSignedCurrency(-group.dividendTax) : "-"}</span>
+                    </span>
+                    <span class="account-summary-dividend-item">
+                      <strong>세후</strong>
+                      <span>${formatCurrency(group.netDividendIncome)}</span>
+                    </span>
+                    <span class="account-summary-dividend-item">
+                      <strong>세후 월배당</strong>
+                      <span>${formatCurrency(group.monthlyNetDividendIncome)}</span>
+                    </span>
+                  </div>
+                </div>
+              `,
+            )
+            .join("")}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function renderPortfolioSection(portfolio) {
   const heroCopy = portfolio.hasForeignCurrency
     ? `${portfolio.snapshotLabel} 원장 데이터를 유지하고, 현재가와 환율만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어 계산합니다. 달러 종목은 USD 기준으로 표기하고 계좌 합계와 비중은 KRW 환산으로 계산합니다.`
@@ -2895,7 +3104,6 @@ function renderSidebarNavigation(book) {
     <aside class="dashboard-sidebar">
       <div class="sidebar-nav-card">
         <div class="sidebar-nav-brand">
-          <span class="sidebar-nav-brand-mark">2</span>
           <div>
             <strong>Portfolio</strong>
           </div>
@@ -2934,17 +3142,15 @@ function renderSidebarNavigation(book) {
 
           <div class="sidebar-nav-group">
             <p class="sidebar-nav-group-label">Accounts</p>
-            <a
-              class="sidebar-nav-link"
-              href="#account-details"
-              data-section-link
-              data-section-target="account-details"
-            >
-              <span class="sidebar-nav-link-kicker">2</span>
-              <span>계좌별 상세</span>
-            </a>
-
             <div class="sidebar-nav-subgroup">
+              <a
+                class="sidebar-nav-link is-subitem"
+                href="#account-summary"
+                data-section-link
+                data-section-target="account-summary"
+              >
+                <span>Overview</span>
+              </a>
               ${book.portfolios
                 .map(
                   (portfolio) => `
@@ -3077,6 +3283,8 @@ function renderApp(book) {
           ${renderTreemapSection(treemap)}
 
           ${renderAllHoldingsSection(book)}
+
+          ${renderAccountSummarySection(book)}
 
           <section
             class="detail-section sidebar-anchor-section"
