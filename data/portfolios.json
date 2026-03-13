@@ -186,7 +186,7 @@
     {
       "id": "isa",
       "name": "ISA",
-      "snapshotLabel": "2026년 3월 9일 22:36 스크린샷 2장 기준",
+      "snapshotLabel": "2026년 3월 13일 일부 평균단가 사용자 제공 반영, 시세는 2026년 3월 9일 22:36 스크린샷 2장 기준",
       "cash": 0,
       "holdings": [
         {
@@ -194,7 +194,7 @@
           "name": "SK텔레콤",
           "type": "주식",
           "quantity": 249,
-          "costBasis": 13308300,
+          "costBasis": 13456458,
           "snapshotPrice": 75800
         },
         {
@@ -202,7 +202,7 @@
           "name": "TIGER 미국배당다우존스타겟커버드콜2호",
           "type": "ETF",
           "quantity": 1376,
-          "costBasis": 13870080,
+          "costBasis": 13951264,
           "snapshotPrice": 11220,
           "nameInferred": true
         },
@@ -211,7 +211,7 @@
           "name": "현대차우",
           "type": "우선주",
           "quantity": 51,
-          "costBasis": 10531500,
+          "costBasis": 8598549,
           "snapshotPrice": 253500
         },
         {
@@ -219,7 +219,7 @@
           "name": "맥쿼리인프라",
           "type": "인프라",
           "quantity": 1010,
-          "costBasis": 11718930,
+          "costBasis": 11458450,
           "snapshotPrice": 11240
         },
         {
@@ -227,7 +227,7 @@
           "name": "하나금융지주",
           "type": "주식",
           "quantity": 90,
-          "costBasis": 8286600,
+          "costBasis": 6921450,
           "snapshotPrice": 107900
         },
         {
@@ -235,7 +235,7 @@
           "name": "TIGER 미국배당다우존스",
           "type": "ETF",
           "quantity": 597,
-          "costBasis": 7799805,
+          "costBasis": 6892962,
           "snapshotPrice": 14540
         },
         {
@@ -243,7 +243,7 @@
           "name": "KODEX 미국배당커버드콜액티브",
           "type": "ETF",
           "quantity": 506,
-          "costBasis": 6495406,
+          "costBasis": 6204572,
           "snapshotPrice": 12810,
           "nameInferred": true
         },
@@ -260,7 +260,7 @@
           "name": "PLUS 자사주매입고배당주",
           "type": "ETF",
           "quantity": 407,
-          "costBasis": 4525840,
+          "costBasis": 4111107,
           "snapshotPrice": 12400
         },
         {
@@ -268,7 +268,7 @@
           "name": "KODEX 한국부동산리츠인프라",
           "type": "ETF",
           "quantity": 883,
-          "costBasis": 4282550,
+          "costBasis": 4211910,
           "snapshotPrice": 4770,
           "nameInferred": true
         },
@@ -277,7 +277,7 @@
           "name": "우리금융지주",
           "type": "주식",
           "quantity": 105,
-          "costBasis": 2890125,
+          "costBasis": 1661310,
           "snapshotPrice": 31550
         },
         {
@@ -285,7 +285,7 @@
           "name": "대신증권우",
           "type": "우선주",
           "quantity": 125,
-          "costBasis": 2600000,
+          "costBasis": 1949750,
           "snapshotPrice": 25100
         },
         {
@@ -301,7 +301,7 @@
           "name": "TIGER 코리아배당다우존스",
           "type": "ETF",
           "quantity": 142,
-          "costBasis": 1921970,
+          "costBasis": 1721750,
           "snapshotPrice": 15390,
           "nameInferred": true
         },
@@ -310,7 +310,7 @@
           "name": "KB발해인프라",
           "type": "인프라",
           "quantity": 200,
-          "costBasis": 1944000,
+          "costBasis": 1517000,
           "snapshotPrice": 10020
         },
         {
@@ -318,7 +318,7 @@
           "name": "기업은행",
           "type": "주식",
           "quantity": 71,
-          "costBasis": 1480350,
+          "costBasis": 1019773,
           "snapshotPrice": 22800
         }
       ]

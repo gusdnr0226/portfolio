@@ -1,6 +1,7 @@
 const PORTFOLIOS_URL = "./data/portfolios.json";
 const LIVE_PRICES_URL = "./data/live-prices.json";
 const DIVIDENDS_URL = "./data/dividends.json";
+const DIVIDEND_CALENDAR_URL = "./data/dividend-calendar.json";
 const GITHUB_API_BASE_URL = "https://api.github.com/repos/gusdnr0226/portfolio";
 const GITHUB_LIVE_PRICES_URL =
   `${GITHUB_API_BASE_URL}/contents/data/live-prices.json?ref=main`;
@@ -8,6 +9,14 @@ const LIVE_PRICE_PROXY_BASE_URL = "https://r.jina.ai/http://";
 const YAHOO_SPARK_BASE_URL = "https://query1.finance.yahoo.com/v7/finance/spark";
 const YAHOO_SPARK_BATCH_SIZE = 20;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const AMOUNT_VISIBILITY_STORAGE_KEY = "portfolio.hide-amounts";
+const MONTH_LABELS = Array.from({ length: 12 }, (_, index) => `${index + 1}월`);
+const DIVIDEND_OVERRIDE_RULES = {
+  ULTY: {
+    yieldRate: 0.5,
+    calendarStrategy: "weekly-even-52",
+  },
+};
 const TREEMAP_LAYOUT_ORDER_BY_SUPER = {
   "해외": ["SCHD", "S&P500", "Nasdaq", "커버드콜", "부동산/리츠", "채권", "USD", "기타"],
   "국내": ["배당ETF", "인프라", "통신", "제조", "금융", "원화", "MM"],
@@ -247,6 +256,10 @@ const decimalFormatter = new Intl.NumberFormat("ko-KR", {
   minimumFractionDigits: 0,
   maximumFractionDigits: 1,
 });
+const exchangeRateFormatter = new Intl.NumberFormat("ko-KR", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 const usdCurrencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -283,6 +296,9 @@ const state = {
   portfolioSource: null,
   livePriceSource: null,
   dividendSource: null,
+  dividendCalendarSource: null,
+  dividendCalendarError: null,
+  hideAmounts: loadAmountVisibilityPreference(),
   isRefreshing: false,
   refreshError: null,
   refreshPhase: null,
@@ -328,15 +344,69 @@ const treemapCategoryOrderLookup = new Map(
   TREEMAP_LAYOUT_ORDER_GLOBAL.map((category, index) => [category, index]),
 );
 
+function loadAmountVisibilityPreference() {
+  try {
+    return window.localStorage.getItem(AMOUNT_VISIBILITY_STORAGE_KEY) === "true";
+  } catch (error) {
+    return false;
+  }
+}
+
+function persistAmountVisibilityPreference() {
+  try {
+    window.localStorage.setItem(AMOUNT_VISIBILITY_STORAGE_KEY, String(state.hideAmounts));
+  } catch (error) {
+    // Ignore storage errors and keep the in-memory preference.
+  }
+}
+
+function shouldHideAmounts() {
+  return Boolean(state.hideAmounts);
+}
+
+function getMaskedAmountText(value, currency = "KRW", { signed = false, unitless = false } = {}) {
+  const prefix = signed ? (value > 0 ? "+" : value < 0 ? "-" : "") : "";
+
+  if (unitless) {
+    return `${prefix}****`;
+  }
+
+  return currency === "USD" ? `${prefix}$****` : `${prefix}****원`;
+}
+
 function formatCurrency(value) {
+  if (shouldHideAmounts()) {
+    return getMaskedAmountText(value, "KRW");
+  }
+
   return `${currencyFormatter.format(Math.round(value))}원`;
 }
 
 function formatCompactCurrency(value) {
+  if (shouldHideAmounts()) {
+    return getMaskedAmountText(value, "KRW");
+  }
+
   return `${compactCurrencyFormatter.format(Math.round(value))}원`;
 }
 
+function formatCompactMoney(value, currency = "KRW") {
+  if (shouldHideAmounts()) {
+    return getMaskedAmountText(value, currency);
+  }
+
+  if (currency === "USD") {
+    return usdCompactCurrencyFormatter.format(Number(value.toFixed(1)));
+  }
+
+  return formatCompactCurrency(value);
+}
+
 function formatSignedCurrency(value) {
+  if (shouldHideAmounts()) {
+    return getMaskedAmountText(value, "KRW", { signed: true });
+  }
+
   const rounded = Math.round(value);
   const prefix = rounded > 0 ? "+" : "";
   return `${prefix}${currencyFormatter.format(rounded)}원`;
@@ -358,12 +428,101 @@ function getCashUsd(account) {
   return Number(account?.cashUsd ?? 0);
 }
 
-function getAnnualDividendPerShare(dividendSource, holding) {
+function getDividendOverrideRule(ticker) {
+  return typeof ticker === "string" ? DIVIDEND_OVERRIDE_RULES[ticker] ?? null : null;
+}
+
+function getAnnualDividendPerShare(dividendSource, holding, currentPrice) {
+  const overrideRule = getDividendOverrideRule(holding?.ticker);
+
+  if (
+    Number.isFinite(overrideRule?.yieldRate) &&
+    Number.isFinite(currentPrice) &&
+    currentPrice > 0
+  ) {
+    return currentPrice * overrideRule.yieldRate;
+  }
+
   const annualDividendPerShare = dividendSource?.dividends?.[holding?.ticker]?.annualDividendPerShare;
   return Number.isFinite(annualDividendPerShare) ? annualDividendPerShare : 0;
 }
 
+function getDividendCalendarProjectionYear(source) {
+  return Number.isFinite(source?.projectionYear) && source.projectionYear > 0
+    ? source.projectionYear
+    : new Date().getUTCFullYear();
+}
+
+function buildWeeklyEvenMonthlyAmounts(year, annualAmount) {
+  if (!Number.isFinite(year) || year <= 0 || !Number.isFinite(annualAmount) || annualAmount <= 0) {
+    return {};
+  }
+
+  const firstFriday = new Date(Date.UTC(year, 0, 1));
+
+  while (firstFriday.getUTCDay() !== 5) {
+    firstFriday.setUTCDate(firstFriday.getUTCDate() + 1);
+  }
+
+  const weeklyPayouts = Array.from({ length: 52 }, (_, index) => {
+    const payout = new Date(firstFriday);
+    payout.setUTCDate(firstFriday.getUTCDate() + index * 7);
+    return payout;
+  });
+  const rawMonthlyTotals = Array.from({ length: 12 }, () => 0);
+  const weeklyAmount = annualAmount / weeklyPayouts.length;
+
+  weeklyPayouts.forEach((payoutDate) => {
+    rawMonthlyTotals[payoutDate.getUTCMonth()] += weeklyAmount;
+  });
+
+  let allocatedAmount = 0;
+
+  return rawMonthlyTotals.reduce((monthlyAmounts, rawMonthlyAmount, monthIndex) => {
+    const isLastMonth = monthIndex === rawMonthlyTotals.length - 1;
+    const amount = isLastMonth
+      ? Number((annualAmount - allocatedAmount).toFixed(2))
+      : Number(rawMonthlyAmount.toFixed(2));
+
+    if (!isLastMonth) {
+      allocatedAmount += amount;
+    }
+
+    if (amount !== 0) {
+      monthlyAmounts[monthIndex + 1] = amount;
+    }
+
+    return monthlyAmounts;
+  }, {});
+}
+
+function getDividendCalendarMonthlyAmounts(entry, reference, projectionYear) {
+  const overrideRule = getDividendOverrideRule(entry?.ticker ?? reference?.ticker);
+
+  if (
+    overrideRule?.calendarStrategy === "weekly-even-52" &&
+    Number.isFinite(reference?.currentPrice) &&
+    Number.isFinite(reference?.quantity) &&
+    reference.quantity > 0
+  ) {
+    return buildWeeklyEvenMonthlyAmounts(
+      projectionYear,
+      reference.currentPrice * overrideRule.yieldRate * reference.quantity,
+    );
+  }
+
+  return entry?.monthlyAmounts &&
+    typeof entry.monthlyAmounts === "object" &&
+    !Array.isArray(entry.monthlyAmounts)
+    ? entry.monthlyAmounts
+    : {};
+}
+
 function formatMoney(value, currency = "KRW") {
+  if (shouldHideAmounts()) {
+    return getMaskedAmountText(value, currency);
+  }
+
   if (currency === "USD") {
     return usdCurrencyFormatter.format(value);
   }
@@ -372,6 +531,10 @@ function formatMoney(value, currency = "KRW") {
 }
 
 function formatSignedMoney(value, currency = "KRW") {
+  if (shouldHideAmounts()) {
+    return getMaskedAmountText(value, currency, { signed: true });
+  }
+
   if (currency === "USD") {
     const prefix = value > 0 ? "+" : value < 0 ? "-" : "";
     return `${prefix}${usdCurrencyFormatter.format(Math.abs(value))}`;
@@ -385,6 +548,10 @@ function formatPrice(value, currency = "KRW") {
 }
 
 function formatHoldingMoney(value, currency = "KRW") {
+  if (shouldHideAmounts()) {
+    return getMaskedAmountText(value, currency);
+  }
+
   if (currency === "USD") {
     return usdWholeCurrencyFormatter.format(value);
   }
@@ -393,6 +560,10 @@ function formatHoldingMoney(value, currency = "KRW") {
 }
 
 function formatSignedHoldingMoney(value, currency = "KRW") {
+  if (shouldHideAmounts()) {
+    return getMaskedAmountText(value, currency, { signed: true });
+  }
+
   if (currency === "USD") {
     const prefix = value > 0 ? "+" : value < 0 ? "-" : "";
     return `${prefix}${usdWholeCurrencyFormatter.format(Math.abs(value))}`;
@@ -402,6 +573,10 @@ function formatSignedHoldingMoney(value, currency = "KRW") {
 }
 
 function formatOverallMoney(value, currency = "KRW") {
+  if (shouldHideAmounts()) {
+    return getMaskedAmountText(value, currency);
+  }
+
   if (currency === "USD") {
     return usdCompactCurrencyFormatter.format(Number(value.toFixed(1)));
   }
@@ -410,6 +585,10 @@ function formatOverallMoney(value, currency = "KRW") {
 }
 
 function formatSignedOverallMoney(value, currency = "KRW") {
+  if (shouldHideAmounts()) {
+    return getMaskedAmountText(value, currency, { signed: true });
+  }
+
   if (currency === "USD") {
     const prefix = value > 0 ? "+" : value < 0 ? "-" : "";
     return `${prefix}${usdCompactCurrencyFormatter.format(Number(Math.abs(value).toFixed(1)))}`;
@@ -435,6 +614,10 @@ function formatOverallDividendYield(annualDividendPerShare, currentPrice) {
 }
 
 function formatAverageCost(value, currency = "KRW") {
+  if (shouldHideAmounts()) {
+    return getMaskedAmountText(value, currency);
+  }
+
   if (currency === "USD") {
     return usdCurrencyFormatter.format(value);
   }
@@ -458,10 +641,18 @@ function formatTreemapPercent(value) {
 }
 
 function formatTreemapAmount(value) {
+  if (shouldHideAmounts()) {
+    return getMaskedAmountText(value, "KRW", { unitless: true });
+  }
+
   return currencyFormatter.format(Math.round(value));
 }
 
 function formatTreemapCompactAmount(value) {
+  if (shouldHideAmounts()) {
+    return getMaskedAmountText(value, "KRW", { unitless: true });
+  }
+
   return compactCurrencyFormatter.format(Math.round(value));
 }
 
@@ -499,7 +690,7 @@ function formatCashBreakdown(cashKrw, cashUsd) {
   }
 
   if (cashUsd > 0) {
-    parts.push(`달러 ${usdCurrencyFormatter.format(cashUsd)}`);
+    parts.push(`달러 ${formatMoney(cashUsd, "USD")}`);
   }
 
   return parts.join(" + ");
@@ -511,6 +702,23 @@ function formatUpdatedAt(value) {
   }
 
   return dateTimeFormatter.format(new Date(value));
+}
+
+function formatExchangeRate(value) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "-";
+  }
+
+  return `${exchangeRateFormatter.format(value)}원`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function getToneClass(value) {
@@ -793,6 +1001,16 @@ async function fetchDividendData() {
   return payload;
 }
 
+async function fetchDividendCalendarData() {
+  const payload = await fetchJson(DIVIDEND_CALENDAR_URL);
+
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("Invalid dividend calendar payload");
+  }
+
+  return payload;
+}
+
 async function fetchGitHubLivePrices() {
   const payload = await fetchJson(GITHUB_LIVE_PRICES_URL, {
     headers: {
@@ -930,7 +1148,7 @@ function buildPortfolioData(source, livePriceSource, dividendSource) {
     const marketValueBase = convertToBaseCurrency(marketValue, currency, usdKrwRate);
     const costBasisBase = convertToBaseCurrency(holding.costBasis, currency, usdKrwRate);
     const profitLossBase = marketValueBase - costBasisBase;
-    const annualDividendPerShare = getAnnualDividendPerShare(dividendSource, holding);
+    const annualDividendPerShare = getAnnualDividendPerShare(dividendSource, holding, currentPrice);
     const annualDividendIncome = annualDividendPerShare * holding.quantity;
     const annualDividendIncomeBase = convertToBaseCurrency(
       annualDividendIncome,
@@ -1057,6 +1275,141 @@ function buildBookData(source, livePriceSource, dividendSource) {
     hasForeignCurrency: portfolios.some((portfolio) => portfolio.hasForeignCurrency),
     portfolios,
     overview,
+  };
+}
+
+function getBookUsdKrwRate(book) {
+  const liveRate = book.livePriceSource?.quotes?.["KRW=X"]?.price;
+
+  if (Number.isFinite(liveRate) && liveRate > 0) {
+    return liveRate;
+  }
+
+  const portfolioRate = book.portfolios
+    .map((portfolio) => portfolio.usdKrwRate)
+    .find((rate) => Number.isFinite(rate) && rate > 0);
+
+  return portfolioRate ?? 0;
+}
+
+function buildDividendCalendarData(book, source, error = null) {
+  const holdingLookup = new Map();
+
+  book.portfolios.forEach((portfolio) => {
+    portfolio.holdings.forEach((holding) => {
+      holdingLookup.set(`${portfolio.id}:${holding.ticker}`, {
+        accountName: portfolio.name,
+        ticker: holding.ticker,
+        name: holding.name,
+        currency: holding.currency,
+        quantity: holding.quantity,
+        currentPrice: holding.currentPrice,
+      });
+    });
+  });
+
+  const projectionYear = getDividendCalendarProjectionYear(source);
+  const months = MONTH_LABELS.map((label, index) => ({
+    month: index + 1,
+    label,
+    totals: {
+      KRW: 0,
+      USD: 0,
+    },
+    items: {
+      KRW: [],
+      USD: [],
+    },
+  }));
+  const entries = Array.isArray(source?.entries) ? source.entries : [];
+  let populatedEntryCount = 0;
+
+  entries.forEach((entry) => {
+    const reference = holdingLookup.get(`${entry?.accountId ?? ""}:${entry?.ticker ?? ""}`) ?? null;
+    const currency =
+      entry?.currency === "USD" || reference?.currency === "USD"
+        ? "USD"
+        : "KRW";
+    const accountName =
+      typeof entry?.accountName === "string" && entry.accountName.trim()
+        ? entry.accountName.trim()
+        : reference?.accountName ?? entry?.accountId ?? "계좌 미지정";
+    const name =
+      typeof entry?.name === "string" && entry.name.trim()
+        ? entry.name.trim()
+        : reference?.name ?? entry?.ticker ?? "미지정 종목";
+    const monthlyAmounts = getDividendCalendarMonthlyAmounts(entry, reference, projectionYear);
+    let hasValue = false;
+
+    months.forEach((monthData, index) => {
+      const rawAmount = monthlyAmounts[index + 1] ?? monthlyAmounts[String(index + 1)] ?? 0;
+      const amount = Number(rawAmount);
+
+      if (!Number.isFinite(amount) || amount === 0) {
+        return;
+      }
+
+      monthData.totals[currency] += amount;
+      monthData.items[currency].push({
+        accountName,
+        name,
+        ticker: entry?.ticker ?? null,
+        amount,
+      });
+      hasValue = true;
+    });
+
+    if (hasValue) {
+      populatedEntryCount += 1;
+    }
+  });
+
+  const totals = months.reduce(
+    (accumulator, monthData) => {
+      accumulator.KRW += monthData.totals.KRW;
+      accumulator.USD += monthData.totals.USD;
+      return accumulator;
+    },
+    {
+      KRW: 0,
+      USD: 0,
+    },
+  );
+  const maxByCurrency = months.reduce(
+    (accumulator, monthData) => ({
+      KRW: Math.max(accumulator.KRW, monthData.totals.KRW),
+      USD: Math.max(accumulator.USD, monthData.totals.USD),
+    }),
+    {
+      KRW: 0,
+      USD: 0,
+    },
+  );
+  const usdKrwRate = getBookUsdKrwRate(book);
+  const sharedMaxKrw = months.reduce(
+    (maximum, monthData) =>
+      Math.max(maximum, monthData.totals.KRW + monthData.totals.USD * usdKrwRate),
+    0,
+  );
+  const sharedMaxUsd = usdKrwRate > 0 ? sharedMaxKrw / usdKrwRate : 0;
+  const convertedUsdTotalKrw = totals.USD * usdKrwRate;
+
+  return {
+    year: projectionYear,
+    updatedAt: source?.updatedAt ?? null,
+    methodology: source?.methodology ?? "",
+    months,
+    totals,
+    maxByCurrency,
+    usdKrwRate,
+    sharedMaxKrw,
+    sharedMaxUsd,
+    convertedUsdTotalKrw,
+    totalBaseKrw: totals.KRW + convertedUsdTotalKrw,
+    entryCount: entries.length,
+    populatedEntryCount,
+    hasData: totals.KRW > 0 || totals.USD > 0,
+    error,
   };
 }
 
@@ -2107,21 +2460,6 @@ function buildMarketStatus(book) {
   };
 }
 
-function getPriceSourceLabel(priceSource) {
-  switch (priceSource) {
-    case "live":
-      return "자동 시세";
-    case "stored":
-      return "저장 시세";
-    case "mixed":
-      return "혼합 시세";
-    case "manual":
-      return "수동 가격";
-    default:
-      return "스냅샷";
-  }
-}
-
 function formatUnavailableDirectPriceNote(book) {
   const unavailableHoldings = buildAggregatedHoldings(book).filter(
     (holding) => holding.priceSource !== "live",
@@ -2663,6 +3001,156 @@ function renderPortfolioCircleChart(treemap) {
   `;
 }
 
+function buildDividendCalendarTooltip(monthData, calendar) {
+  const lines = [`${monthData.label} 배당 추정`];
+  const convertedUsdValue = monthData.totals.USD * calendar.usdKrwRate;
+
+  lines.push(`원화 ${formatMoney(monthData.totals.KRW, "KRW")}`);
+  lines.push(
+    calendar.usdKrwRate > 0
+      ? `외화 ${formatMoney(monthData.totals.USD, "USD")} (${formatCurrency(convertedUsdValue)} 환산)`
+      : `외화 ${formatMoney(monthData.totals.USD, "USD")}`,
+  );
+
+  const appendItems = (label, items, currency) => {
+    if (!items.length) {
+      return;
+    }
+
+    lines.push(label);
+    [...items]
+      .sort(
+        (left, right) =>
+          right.amount - left.amount ||
+          left.name.localeCompare(right.name, "ko-KR"),
+      )
+      .slice(0, 4)
+      .forEach((item) => {
+        lines.push(`- ${item.accountName} · ${item.name}: ${formatMoney(item.amount, currency)}`);
+      });
+  };
+
+  appendItems("원화 구성", monthData.items.KRW, "KRW");
+  appendItems("외화 구성", monthData.items.USD, "USD");
+
+  return escapeHtml(lines.join("\n"));
+}
+
+function renderDividendCalendarSection(book, source, error = null) {
+  const calendar = buildDividendCalendarData(book, source, error);
+  const usdRateCopy =
+    calendar.usdKrwRate > 0
+      ? `1 USD = ${formatExchangeRate(calendar.usdKrwRate)} 기준으로 외화 구간을 환산해 원화 구간 위에 함께 누적합니다.`
+      : "외화 막대 높이는 USD 원금 기준으로 표시합니다.";
+  const sectionCopy = error
+    ? `배당 캘린더 파일을 읽지 못했습니다: ${error.message}`
+    : `월을 바닥 축에 두고, 한 막대 안에 외화 배당을 먼저 쌓고 그 위에 원화 배당을 올립니다. ${usdRateCopy}`;
+
+  return `
+    <section
+      class="dividend-calendar-card sidebar-anchor-section"
+      id="dividend-calendar"
+      data-nav-section
+    >
+      <div class="section-head">
+        <div>
+          <h2 class="section-title">배당 캘린더</h2>
+          <p class="section-copy">${sectionCopy}</p>
+        </div>
+        <div class="section-pill">${calendar.year}년 추정</div>
+      </div>
+
+      <div class="dividend-calendar-summary">
+        <article class="dividend-calendar-stat" data-currency="KRW">
+          <span class="dividend-calendar-stat-label">원화 연간 추정</span>
+          <strong class="dividend-calendar-stat-value">${formatMoney(calendar.totals.KRW, "KRW")}</strong>
+          <span class="dividend-calendar-stat-sub">입력 월 ${currencyFormatter.format(calendar.months.filter((monthData) => monthData.totals.KRW > 0).length)}개</span>
+        </article>
+        <article class="dividend-calendar-stat" data-currency="USD">
+          <span class="dividend-calendar-stat-label">달러 연간 추정</span>
+          <strong class="dividend-calendar-stat-value">${formatMoney(calendar.totals.USD, "USD")}</strong>
+          <span class="dividend-calendar-stat-sub">입력 월 ${currencyFormatter.format(calendar.months.filter((monthData) => monthData.totals.USD > 0).length)}개</span>
+        </article>
+        <article class="dividend-calendar-stat" data-currency="BASE">
+          <span class="dividend-calendar-stat-label">환산 합계</span>
+          <strong class="dividend-calendar-stat-value">${formatCurrency(calendar.totalBaseKrw)}</strong>
+          <span class="dividend-calendar-stat-sub">외화 약 ${formatCurrency(calendar.convertedUsdTotalKrw)} 환산 포함</span>
+        </article>
+        <article class="dividend-calendar-stat">
+          <span class="dividend-calendar-stat-label">적용 환율 / 엔트리</span>
+          <strong class="dividend-calendar-stat-value">${formatExchangeRate(calendar.usdKrwRate)}</strong>
+          <span class="dividend-calendar-stat-sub">${currencyFormatter.format(calendar.populatedEntryCount)} / ${currencyFormatter.format(calendar.entryCount)} · ${calendar.updatedAt ? `업데이트 ${formatUpdatedAt(calendar.updatedAt)}` : "data/dividend-calendar.json에서 관리"}</span>
+        </article>
+      </div>
+
+      ${calendar.hasData
+        ? ""
+        : `
+          <div class="dividend-calendar-empty">
+            data/dividend-calendar.json의 각 종목 monthlyAmounts에 1~12월 금액을 넣으면 월별 막대가 채워집니다.
+          </div>
+        `}
+
+      <div class="dividend-calendar-combined-wrap">
+        <div class="dividend-calendar-combined-meta">
+          <span class="dividend-calendar-combined-chip is-usd">막대 하단: 외화 배당</span>
+          <span class="dividend-calendar-combined-chip is-krw">막대 상단: 원화 배당</span>
+          <span class="dividend-calendar-combined-note">${calendar.usdKrwRate > 0 ? `우측 축은 현재 환율 ${formatExchangeRate(calendar.usdKrwRate)}/USD 환산 기준` : "우측 축 환산 정보 없음"}</span>
+        </div>
+
+        <div class="dividend-calendar-combined-chart">
+          <div class="dividend-calendar-axis dividend-calendar-axis-left" aria-hidden="true">
+            <span class="dividend-calendar-axis-title">KRW</span>
+            <span class="dividend-calendar-axis-value is-top">${formatMoney(calendar.sharedMaxKrw, "KRW")}</span>
+            <span class="dividend-calendar-axis-zero">0</span>
+          </div>
+
+          <div
+            class="dividend-calendar-combined-plot"
+            role="img"
+            aria-label="${calendar.year}년 월별 배당 추정 스택 막대그래프: 각 월 막대의 하단은 외화 배당, 상단은 원화 배당이며 외화는 현재 환율로 환산해 높이를 맞췄습니다."
+          >
+            ${calendar.months
+              .map((monthData) => {
+                const usdKrwValue = monthData.totals.USD * calendar.usdKrwRate;
+                const totalBaseValue = monthData.totals.KRW + usdKrwValue;
+                const totalHeight =
+                  calendar.sharedMaxKrw > 0 && totalBaseValue > 0
+                    ? (totalBaseValue / calendar.sharedMaxKrw) * 100
+                    : 0;
+                const usdShare = totalBaseValue > 0 ? (usdKrwValue / totalBaseValue) * 100 : 0;
+                const krwShare = totalBaseValue > 0 ? (monthData.totals.KRW / totalBaseValue) * 100 : 0;
+
+                return `
+                  <div
+                    class="dividend-calendar-month${monthData.totals.KRW > 0 || monthData.totals.USD > 0 ? "" : " is-empty"}"
+                    title="${buildDividendCalendarTooltip(monthData, calendar)}"
+                  >
+                    <span class="dividend-calendar-value is-total">${totalBaseValue > 0 ? formatCompactMoney(totalBaseValue, "KRW") : ""}</span>
+                    <div class="dividend-calendar-stack-shell">
+                      <div class="dividend-calendar-stack" style="height:${totalHeight.toFixed(1)}%">
+                        <span class="dividend-calendar-bar is-usd" style="height:${usdShare.toFixed(1)}%"></span>
+                        <span class="dividend-calendar-bar is-krw" style="height:${krwShare.toFixed(1)}%"></span>
+                      </div>
+                    </div>
+                    <span class="dividend-calendar-label">${monthData.label}</span>
+                  </div>
+                `;
+              })
+              .join("")}
+          </div>
+
+          <div class="dividend-calendar-axis dividend-calendar-axis-right" aria-hidden="true">
+            <span class="dividend-calendar-axis-title">USD</span>
+            <span class="dividend-calendar-axis-value is-top">${formatMoney(calendar.sharedMaxUsd, "USD")}</span>
+            <span class="dividend-calendar-axis-zero">$0</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function setPortfolioCircleActiveGroup(card, activeGroup) {
   if (!card) {
     return;
@@ -2814,14 +3302,6 @@ function renderTableRows(portfolio) {
         <tr>
           <td>
             <div class="asset-name">${holding.name}</div>
-            <div class="asset-meta">
-              <span class="tag">${holding.type}</span>
-              ${holding.currency !== "KRW" ? `<span class="tag">${holding.currency}</span>` : ""}
-              <span class="tag ${holding.priceSource === "snapshot" || holding.priceSource === "manual" ? "tag-warning" : "tag-live"}">
-                ${getPriceSourceLabel(holding.priceSource)}
-              </span>
-              ${holding.nameInferred ? '<span class="tag tag-warning">이름 추정</span>' : ""}
-            </div>
           </td>
           <td>${formatQuantity(holding.quantity)}</td>
           <td>
@@ -2830,10 +3310,19 @@ function renderTableRows(portfolio) {
             </div>
           </td>
           <td>${formatAverageCost(holding.averageCost, holding.currency)}</td>
-          <td>${formatHoldingMoney(holding.costBasis, holding.currency)}</td>
-          <td>${formatHoldingMoney(holding.marketValue, holding.currency)}</td>
-          <td class="${getToneClass(holding.profitLoss)}">${formatSignedHoldingMoney(holding.profitLoss, holding.currency)}</td>
-          <td class="${getToneClass(holding.profitRate)}">${formatSignedPercent(holding.profitRate)}</td>
+          <td>
+            <div class="all-holdings-value-stack">
+              <strong>${formatHoldingMoney(holding.marketValue, holding.currency)}</strong>
+              <span class="all-holdings-value-sub ${getToneClass(holding.profitLoss)}">${formatHoldingProfitWithRate(holding.profitLoss, holding.profitRate, holding.currency)}</span>
+            </div>
+          </td>
+          <td>
+            <div class="all-holdings-value-stack">
+              <strong>${formatMoney(holding.annualDividendPerShare, holding.currency)}</strong>
+              <span class="all-holdings-value-sub">${formatOverallDividendYield(holding.annualDividendPerShare, holding.currentPrice)}</span>
+            </div>
+          </td>
+          <td>${formatHoldingMoney(holding.annualDividendIncome, holding.currency)}</td>
           <td>${formatPercent(holding.assetWeight)}</td>
         </tr>
       `,
@@ -2998,8 +3487,8 @@ function renderPortfolioSection(portfolio) {
     ? `${portfolio.snapshotLabel} 원장 데이터를 유지하고, 현재가와 환율만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어 계산합니다. 달러 종목은 USD 기준으로 표기하고 계좌 합계와 비중은 KRW 환산으로 계산합니다.`
     : `${portfolio.snapshotLabel} 원장 데이터를 유지하고, 현재가만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어 평가금액과 손익을 재계산합니다.`;
   const tableCopy = portfolio.hasForeignCurrency
-    ? "수량과 매입금액은 고정 원장 데이터입니다. 해외 종목 금액은 USD 기준으로 표기하고, 계좌 합계와 비중은 KRW 환산 기준으로 계산합니다."
-    : "수량과 매입금액은 고정 원장 데이터입니다. 현재가, 평가금액, 손익, 수익률은 최신 시세 기준으로 다시 계산됩니다.";
+    ? "수량과 평균단가는 고정 원장 데이터입니다. 해외 종목 금액은 USD 기준으로 표기하고, 계좌 합계와 비중은 KRW 환산 기준으로 계산합니다. 배당/1주와 연배당은 최근 1년 배당 기준입니다."
+    : "수량과 평균단가는 고정 원장 데이터입니다. 현재가, 평가금액, 배당/1주, 연배당은 최신 시세와 최근 1년 배당 기준으로 다시 계산됩니다.";
 
   return `
     <section
@@ -3031,17 +3520,16 @@ function renderPortfolioSection(portfolio) {
         </div>
 
         <div class="table-wrap">
-          <table>
+          <table class="all-holdings-table">
             <thead>
               <tr>
                 <th>종목</th>
                 <th>수량</th>
                 <th>현재가</th>
                 <th>평균단가</th>
-                <th>매입금액</th>
                 <th>평가금액</th>
-                <th>평가손익</th>
-                <th>수익률</th>
+                <th>배당/1주</th>
+                <th>연배당</th>
                 <th>비중</th>
               </tr>
             </thead>
@@ -3054,10 +3542,14 @@ function renderPortfolioSection(portfolio) {
                 <td>${formatQuantity(portfolio.totals.quantity)}</td>
                 <td>-</td>
                 <td>-</td>
-                <td>${formatCurrency(portfolio.totals.costBasis)}</td>
-                <td>${formatCurrency(portfolio.totals.marketValue)}</td>
-                <td class="${getToneClass(portfolio.totals.profitLoss)}">${formatSignedCurrency(portfolio.totals.profitLoss)}</td>
-                <td class="${getToneClass(portfolio.totals.totalReturn)}">${formatSignedPercent(portfolio.totals.totalReturn)}</td>
+                <td>
+                  <div class="all-holdings-value-stack">
+                    <strong>${formatCurrency(portfolio.totals.marketValue)}</strong>
+                    <span class="all-holdings-value-sub ${getToneClass(portfolio.totals.profitLoss)}">${formatProfitWithRateCompact(portfolio.totals.profitLoss, portfolio.totals.totalReturn)}</span>
+                  </div>
+                </td>
+                <td>-</td>
+                <td>${formatCurrency(portfolio.totals.annualDividendIncome)}</td>
                 <td>${formatPercent(portfolio.totals.investedWeight)}</td>
               </tr>
             </tfoot>
@@ -3130,6 +3622,14 @@ function renderSidebarNavigation(book) {
                 data-section-target="dashboard-treemap"
               >
                 <span>Treemap</span>
+              </a>
+              <a
+                class="sidebar-nav-link is-subitem"
+                href="#dividend-calendar"
+                data-section-link
+                data-section-target="dividend-calendar"
+              >
+                <span>Dividend Calendar</span>
               </a>
               <a
                 class="sidebar-nav-link is-subitem"
@@ -3276,6 +3776,13 @@ function renderApp(book) {
                 <button class="ghost-button" data-refresh-quotes ${state.isRefreshing ? "disabled" : ""}>
                   ${state.isRefreshing ? "시세 불러오는 중..." : "시세 다시 불러오기"}
                 </button>
+                <button
+                  class="ghost-button ${state.hideAmounts ? "ghost-button-muted" : ""}"
+                  data-toggle-amount-visibility
+                  aria-pressed="${state.hideAmounts ? "true" : "false"}"
+                >
+                  금액표시 ${state.hideAmounts ? "Off" : "On"}
+                </button>
               </div>
             </div>
           </section>
@@ -3283,6 +3790,8 @@ function renderApp(book) {
           ${renderPortfolioCircleChart(treemap)}
 
           ${renderTreemapSection(treemap)}
+
+          ${renderDividendCalendarSection(book, state.dividendCalendarSource, state.dividendCalendarError)}
 
           ${renderAllHoldingsSection(book)}
 
@@ -3297,7 +3806,7 @@ function renderApp(book) {
               <div>
                 <h2 class="section-title">계좌 상세</h2>
                 <p class="section-copy">
-                  각 계좌의 원장 기준 수량과 평단, 그리고 최신 현재가 기준 평가금액과 손익을 상세 표로 확인합니다.
+                  각 계좌의 원장 기준 수량과 평단, 그리고 최신 현재가와 최근 1년 배당 기준 평가금액, 배당/1주, 연배당을 상세 표로 확인합니다.
                 </p>
               </div>
             </div>
@@ -3369,6 +3878,13 @@ async function initializeApp() {
       fetchJson(PORTFOLIOS_URL),
       fetchDividendData(),
     ]);
+    try {
+      state.dividendCalendarSource = await fetchDividendCalendarData();
+      state.dividendCalendarError = null;
+    } catch (error) {
+      state.dividendCalendarSource = null;
+      state.dividendCalendarError = error;
+    }
     const externalTickers = getExternalQuoteTickers(state.portfolioSource);
 
     try {
@@ -3389,6 +3905,15 @@ async function initializeApp() {
 }
 
 document.addEventListener("click", (event) => {
+  const amountVisibilityButton = event.target.closest("[data-toggle-amount-visibility]");
+
+  if (amountVisibilityButton) {
+    state.hideAmounts = !state.hideAmounts;
+    persistAmountVisibilityPreference();
+    renderCurrentBook();
+    return;
+  }
+
   const refreshButton = event.target.closest("[data-refresh-quotes]");
 
   if (!refreshButton) {

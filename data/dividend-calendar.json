@@ -1,0 +1,731 @@
+{
+  "projectionYear": 2026,
+  "updatedAt": "2026-03-13T14:35:26Z",
+  "methodology": "Annual dividend per share from data/dividends.json is distributed across the closest recent payout cycle inferred from Stock Analysis dividend history pages via r.jina.ai. This keeps the monthly pattern while matching the current annual dividend totals. ULTY is overridden to a fixed 50% yield on current price and spread evenly across 52 weekly payouts.",
+  "entries": [
+    {
+      "accountId": "pension-savings-1",
+      "accountName": "연금저축(세액공제)",
+      "ticker": "379800",
+      "name": "KODEX 미국S&P500",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "2": 38199,
+        "5": 17976,
+        "8": 33384,
+        "11": 35310
+      }
+    },
+    {
+      "accountId": "pension-savings-1",
+      "accountName": "연금저축(세액공제)",
+      "ticker": "493420",
+      "name": "SOL 미국배당다우존스2호",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 15080,
+        "2": 15660,
+        "6": 17980,
+        "7": 10440,
+        "8": 9280,
+        "9": 26100,
+        "10": 12180,
+        "11": 12760,
+        "12": 26100
+      }
+    },
+    {
+      "accountId": "pension-savings-2",
+      "accountName": "연금저축(세액미공제)",
+      "ticker": "379800",
+      "name": "KODEX 미국S&P500",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "2": 111622,
+        "5": 52528,
+        "8": 97552,
+        "11": 103180
+      }
+    },
+    {
+      "accountId": "pension-savings-2",
+      "accountName": "연금저축(세액미공제)",
+      "ticker": "0144L0",
+      "name": "KODEX 미국성장커버드콜액티브",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "2": 97000,
+        "3": 94000
+      }
+    },
+    {
+      "accountId": "pension-savings-2",
+      "accountName": "연금저축(세액미공제)",
+      "ticker": "379810",
+      "name": "KODEX 미국나스닥100",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "2": 17612,
+        "5": 8547,
+        "8": 15281,
+        "11": 16317
+      }
+    },
+    {
+      "accountId": "pension-savings-2",
+      "accountName": "연금저축(세액미공제)",
+      "ticker": "088980",
+      "name": "맥쿼리인프라",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "2": 52440,
+        "8": 52440
+      }
+    },
+    {
+      "accountId": "pension-savings-ingyeong",
+      "accountName": "연금저축(인경)",
+      "ticker": "446720",
+      "name": "SOL 미국배당다우존스",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 19462,
+        "2": 15780,
+        "3": 18410,
+        "4": 19988,
+        "5": 13676,
+        "6": 15780,
+        "7": 17358,
+        "8": 14728,
+        "9": 16832,
+        "10": 18410,
+        "11": 17884,
+        "12": 18410
+      }
+    },
+    {
+      "accountId": "retirement-pension-hyeonuk",
+      "accountName": "퇴직연금(현욱)",
+      "ticker": "251600",
+      "name": "PLUS 고배당주채권혼합",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 22050,
+        "2": 23520,
+        "3": 23520,
+        "4": 22050,
+        "5": 22050,
+        "6": 22050,
+        "7": 22050,
+        "8": 22050,
+        "9": 22050,
+        "10": 22050,
+        "11": 22050,
+        "12": 22050
+      }
+    },
+    {
+      "accountId": "retirement-pension-hyeonuk",
+      "accountName": "퇴직연금(현욱)",
+      "ticker": "088980",
+      "name": "맥쿼리인프라",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "2": 244340,
+        "8": 244340
+      }
+    },
+    {
+      "accountId": "retirement-pension-hyeonuk",
+      "accountName": "퇴직연금(현욱)",
+      "ticker": "458730",
+      "name": "TIGER 미국배당다우존스",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 14680,
+        "2": 11744,
+        "3": 13946,
+        "4": 14680,
+        "5": 9542,
+        "6": 14313,
+        "7": 12478,
+        "8": 11010,
+        "9": 12845,
+        "10": 13946,
+        "11": 11010,
+        "12": 13946
+      }
+    },
+    {
+      "accountId": "retirement-pension-hyeonuk",
+      "accountName": "퇴직연금(현욱)",
+      "ticker": "415640",
+      "name": "KB발해인프라",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "2": 80600,
+        "8": 80600
+      }
+    },
+    {
+      "accountId": "retirement-pension-hyeonuk",
+      "accountName": "퇴직연금(현욱)",
+      "ticker": "458760",
+      "name": "TIGER 미국배당다우존스타겟커버드콜2호",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 12232,
+        "2": 12232,
+        "3": 13066,
+        "4": 13344,
+        "5": 11398,
+        "6": 11954,
+        "7": 11815,
+        "8": 11954,
+        "9": 11954,
+        "10": 11954,
+        "11": 11537,
+        "12": 12093
+      }
+    },
+    {
+      "accountId": "retirement-pension-hyeonuk",
+      "accountName": "퇴직연금(현욱)",
+      "ticker": "441640",
+      "name": "KODEX 미국배당커버드콜액티브",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 3620,
+        "2": 3657,
+        "3": 3657,
+        "4": 3398,
+        "5": 3398,
+        "6": 3324,
+        "7": 3361,
+        "8": 3398,
+        "9": 3398,
+        "10": 3435,
+        "11": 3546,
+        "12": 3620
+      }
+    },
+    {
+      "accountId": "retirement-pension-ingyeong",
+      "accountName": "퇴직연금(인경)",
+      "ticker": "379810",
+      "name": "KODEX 미국나스닥100",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "2": 6868,
+        "5": 3333,
+        "8": 5959,
+        "11": 6363
+      }
+    },
+    {
+      "accountId": "retirement-pension-ingyeong",
+      "accountName": "퇴직연금(인경)",
+      "ticker": "390390",
+      "name": "KODEX 미국반도체",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "2": 1620,
+        "5": 1242,
+        "8": 1161,
+        "11": 1188
+      }
+    },
+    {
+      "accountId": "retirement-pension-ingyeong",
+      "accountName": "퇴직연금(인경)",
+      "ticker": "438080",
+      "name": "ACE 미국S&P500미국채혼합50액티브",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 23046
+      }
+    },
+    {
+      "accountId": "retirement-pension-ingyeong",
+      "accountName": "퇴직연금(인경)",
+      "ticker": "0038A0",
+      "name": "KODEX 미국휴머노이드로봇",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "2": 900,
+        "8": 420,
+        "11": 600
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "017670",
+      "name": "SK텔레콤",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "4": 261450,
+        "6": 206670,
+        "9": 206670,
+        "11": 206670
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "458760",
+      "name": "TIGER 미국배당다우존스타겟커버드콜2호",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 121088,
+        "2": 121088,
+        "3": 129344,
+        "4": 132096,
+        "5": 112832,
+        "6": 118336,
+        "7": 116960,
+        "8": 118336,
+        "9": 118336,
+        "10": 118336,
+        "11": 114208,
+        "12": 119712
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "005385",
+      "name": "현대차우",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "6": 170850,
+        "9": 170850,
+        "12": 170850
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "088980",
+      "name": "맥쿼리인프라",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "2": 383800,
+        "8": 383800
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "086790",
+      "name": "하나금융지주",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "4": 146510,
+        "5": 73743,
+        "8": 74313,
+        "11": 74883
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "458730",
+      "name": "TIGER 미국배당다우존스",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 23880,
+        "2": 19104,
+        "3": 22686,
+        "4": 23880,
+        "5": 15522,
+        "6": 23283,
+        "7": 20298,
+        "8": 17910,
+        "9": 20895,
+        "10": 22686,
+        "11": 17910,
+        "12": 22686
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "441640",
+      "name": "KODEX 미국배당커버드콜액티브",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 49500,
+        "2": 50005,
+        "3": 50005,
+        "4": 46470,
+        "5": 46470,
+        "6": 45460,
+        "7": 45965,
+        "8": 46470,
+        "9": 46470,
+        "10": 46975,
+        "11": 48490,
+        "12": 49500
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "005389",
+      "name": "현대차3우B",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "6": 80400,
+        "9": 80400,
+        "12": 80400
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "0098N0",
+      "name": "PLUS 자사주매입고배당주",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 15852,
+        "2": 15852,
+        "3": 15852,
+        "11": 13870,
+        "12": 13870
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "476800",
+      "name": "KODEX 한국부동산리츠인프라",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 25607,
+        "2": 25607,
+        "3": 34437,
+        "4": 34437,
+        "5": 32671,
+        "6": 30905,
+        "7": 32671,
+        "8": 30022,
+        "9": 30022,
+        "10": 29139,
+        "11": 27373,
+        "12": 25607
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "316140",
+      "name": "우리금융지주",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "4": 65450,
+        "5": 19833,
+        "8": 19833,
+        "11": 37683
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "003545",
+      "name": "대신증권우",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "4": 156250
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "418660",
+      "name": "TIGER 미국나스닥100레버리지(합성)",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 30020
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "0052D0",
+      "name": "TIGER 코리아배당다우존스",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 7064,
+        "2": 7064,
+        "3": 8033,
+        "8": 6648,
+        "9": 6648,
+        "10": 6925,
+        "11": 6925,
+        "12": 6925
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "415640",
+      "name": "KB발해인프라",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "2": 65000,
+        "8": 65000
+      }
+    },
+    {
+      "accountId": "isa",
+      "accountName": "ISA",
+      "ticker": "024110",
+      "name": "기업은행",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "4": 75615
+      }
+    },
+    {
+      "accountId": "direct-investment",
+      "accountName": "직투계좌",
+      "ticker": "SCHD",
+      "name": "SCHD",
+      "currency": "USD",
+      "monthlyAmounts": {
+        "3": 310.38,
+        "6": 324.6,
+        "9": 324.85,
+        "12": 347.05
+      }
+    },
+    {
+      "accountId": "direct-investment",
+      "accountName": "직투계좌",
+      "ticker": "QQQ",
+      "name": "QQQ",
+      "currency": "USD",
+      "monthlyAmounts": {
+        "4": 35.12,
+        "7": 29.01,
+        "10": 34.06,
+        "12": 38.97
+      }
+    },
+    {
+      "accountId": "direct-investment",
+      "accountName": "직투계좌",
+      "ticker": "JEPQ",
+      "name": "JEPQ",
+      "currency": "USD",
+      "monthlyAmounts": {
+        "1": 264.37,
+        "2": 213.72,
+        "3": 233.58,
+        "4": 248.12,
+        "5": 274.36,
+        "6": 284.86,
+        "7": 226.77,
+        "8": 203.64,
+        "9": 202.81,
+        "10": 204.72,
+        "11": 218.22,
+        "12": 253.88
+      }
+    },
+    {
+      "accountId": "direct-investment",
+      "accountName": "직투계좌",
+      "ticker": "JEPI",
+      "name": "JEPI",
+      "currency": "USD",
+      "monthlyAmounts": {
+        "1": 182.81,
+        "2": 147.43,
+        "3": 150.39,
+        "4": 174.62,
+        "5": 208.85,
+        "6": 231.14,
+        "7": 171.02,
+        "8": 153.12,
+        "9": 157.63,
+        "10": 154.53,
+        "11": 148.26,
+        "12": 158.63
+      }
+    },
+    {
+      "accountId": "direct-investment",
+      "accountName": "직투계좌",
+      "ticker": "VOO",
+      "name": "VOO",
+      "currency": "USD",
+      "monthlyAmounts": {
+        "3": 66.55,
+        "7": 64.07,
+        "10": 63.9,
+        "12": 65.04
+      }
+    },
+    {
+      "accountId": "direct-investment",
+      "accountName": "직투계좌",
+      "ticker": "O",
+      "name": "리얼티 인컴",
+      "currency": "USD",
+      "monthlyAmounts": {
+        "1": 67.58,
+        "2": 67.58,
+        "3": 67.58,
+        "4": 67.2,
+        "5": 67.2,
+        "6": 67.2,
+        "7": 67.33,
+        "8": 67.33,
+        "9": 67.33,
+        "10": 67.45,
+        "11": 67.45,
+        "12": 67.45
+      }
+    },
+    {
+      "accountId": "direct-investment",
+      "accountName": "직투계좌",
+      "ticker": "IEF",
+      "name": "IEF",
+      "currency": "USD",
+      "monthlyAmounts": {
+        "2": 35.59,
+        "3": 32.26,
+        "4": 34.64,
+        "5": 35.75,
+        "6": 35.38,
+        "7": 34.59,
+        "8": 35.23,
+        "9": 35.84,
+        "10": 33.59,
+        "11": 34.66,
+        "12": 68.58
+      }
+    },
+    {
+      "accountId": "direct-investment",
+      "accountName": "직투계좌",
+      "ticker": "AGNC",
+      "name": "AGNC 인베스트먼트",
+      "currency": "USD",
+      "monthlyAmounts": {
+        "1": 96,
+        "2": 96,
+        "3": 96,
+        "4": 96,
+        "5": 96,
+        "6": 96,
+        "7": 96,
+        "8": 96,
+        "9": 96,
+        "10": 96,
+        "11": 96,
+        "12": 96
+      }
+    },
+    {
+      "accountId": "direct-investment",
+      "accountName": "직투계좌",
+      "ticker": "TLT",
+      "name": "TLT",
+      "currency": "USD",
+      "monthlyAmounts": {
+        "2": 28.53,
+        "3": 25.85,
+        "4": 27.99,
+        "5": 28.17,
+        "6": 27.47,
+        "7": 28.23,
+        "8": 28.44,
+        "9": 28.21,
+        "10": 26.69,
+        "11": 27.95,
+        "12": 57.01
+      }
+    },
+    {
+      "accountId": "direct-investment",
+      "accountName": "직투계좌",
+      "ticker": "ULTY",
+      "name": "ULTY",
+      "currency": "USD",
+      "monthlyAmounts": {
+        "1": 77.36,
+        "2": 61.88,
+        "3": 61.88,
+        "4": 61.88,
+        "5": 77.36,
+        "6": 61.88,
+        "7": 77.36,
+        "8": 61.88,
+        "9": 61.88,
+        "10": 77.36,
+        "11": 61.88,
+        "12": 61.9
+      }
+    },
+    {
+      "accountId": "direct-investment",
+      "accountName": "직투계좌",
+      "ticker": "QLD",
+      "name": "QLD",
+      "currency": "USD",
+      "monthlyAmounts": {
+        "4": 0.01,
+        "7": 0.06,
+        "9": 0.02,
+        "12": 0.02
+      }
+    },
+    {
+      "accountId": "direct-investment",
+      "accountName": "직투계좌",
+      "ticker": "SSO",
+      "name": "SSO",
+      "currency": "USD",
+      "monthlyAmounts": {
+        "4": 0.08,
+        "7": 0.1,
+        "9": 0.09,
+        "12": 0.12
+      }
+    },
+    {
+      "accountId": "direct-investment",
+      "accountName": "직투계좌",
+      "ticker": "498400",
+      "name": "KODEX 200타겟위클리커버드콜",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "1": 107541,
+        "2": 123192,
+        "3": 127231,
+        "5": 70179,
+        "6": 75733,
+        "7": 81287,
+        "8": 82296,
+        "9": 81287,
+        "10": 86840,
+        "11": 98957,
+        "12": 98957
+      }
+    },
+    {
+      "accountId": "direct-investment",
+      "accountName": "직투계좌",
+      "ticker": "488770",
+      "name": "KODEX 머니마켓액티브",
+      "currency": "KRW",
+      "monthlyAmounts": {
+        "12": 89880
+      }
+    }
+  ]
+}

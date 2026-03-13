@@ -1,7 +1,7 @@
 {
   "provider": "Stock Analysis",
-  "updatedAt": "2026-03-13T05:34:39Z",
-  "methodology": "Trailing 12-month annual dividend per share shown on Stock Analysis dividend pages.",
+  "updatedAt": "2026-03-13T14:35:26Z",
+  "methodology": "Trailing 12-month annual dividend per share shown on Stock Analysis dividend pages, except ULTY which is modeled at a fixed 50% yield on current price.",
   "dividends": {
     "003545": {
       "name": "대신증권우",
@@ -227,8 +227,11 @@
     },
     "ULTY": {
       "name": "ULTY",
-      "annualDividendPerShare": 41.33,
+      "annualDividendPerShare": 16.09,
       "currency": "USD",
+      "manualYieldRate": 0.5,
+      "manualDistribution": "52 weekly payouts",
+      "assumedPrice": 32.18,
       "sourceUrl": "https://stockanalysis.com/etf/ulty/dividend/"
     },
     "VOO": {
