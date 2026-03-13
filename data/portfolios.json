@@ -326,9 +326,9 @@
     {
       "id": "direct-investment",
       "name": "직투계좌",
-      "snapshotLabel": "2026년 3월 10일 21:32 스크린샷 기준",
+      "snapshotLabel": "2026년 3월 13일 사용자 제공 수치 기준",
       "cash": 1813511,
-      "cashUsd": 2059.62,
+      "cashUsd": 1855.5,
       "snapshotUsdKrw": 1472.18,
       "holdings": [
         {
@@ -336,18 +336,18 @@
           "name": "SCHD",
           "type": "ETF",
           "currency": "USD",
-          "quantity": 1239.778469,
-          "costBasis": 33502.33,
-          "snapshotPrice": 30.87
+          "quantity": 1244.643081,
+          "costBasis": 33652.33,
+          "snapshotPrice": 30.94
         },
         {
           "ticker": "QQQ",
           "name": "QQQ",
           "type": "ETF",
           "currency": "USD",
-          "quantity": 48.99814,
-          "costBasis": 25721.57,
-          "snapshotPrice": 605.87
+          "quantity": 49.162301,
+          "costBasis": 25821.57,
+          "snapshotPrice": 598.27
         },
         {
           "ticker": "JEPQ",
@@ -356,7 +356,7 @@
           "currency": "USD",
           "quantity": 459.260168,
           "costBasis": 25814.46,
-          "snapshotPrice": 57.4
+          "snapshotPrice": 56.99
         },
         {
           "ticker": "JEPI",
@@ -365,16 +365,16 @@
           "currency": "USD",
           "quantity": 428.242203,
           "costBasis": 24220.84,
-          "snapshotPrice": 58.36
+          "snapshotPrice": 57.38
         },
         {
           "ticker": "VOO",
           "name": "VOO",
           "type": "ETF",
           "currency": "USD",
-          "quantity": 36.550708,
-          "costBasis": 20301.62,
-          "snapshotPrice": 621.39
+          "quantity": 36.711293,
+          "costBasis": 20401.62,
+          "snapshotPrice": 614.4
         },
         {
           "ticker": "O",
@@ -392,7 +392,7 @@
           "currency": "USD",
           "quantity": 114,
           "costBasis": 11019.81,
-          "snapshotPrice": 96.58
+          "snapshotPrice": 95.69
         },
         {
           "ticker": "AGNC",
@@ -401,7 +401,7 @@
           "currency": "USD",
           "quantity": 800,
           "costBasis": 8425.8,
-          "snapshotPrice": 10.55
+          "snapshotPrice": 10.46
         },
         {
           "ticker": "TLT",
@@ -410,7 +410,7 @@
           "currency": "USD",
           "quantity": 86,
           "costBasis": 7687.29,
-          "snapshotPrice": 88.61
+          "snapshotPrice": 86.83
         },
         {
           "ticker": "ULTY",
@@ -419,7 +419,25 @@
           "currency": "USD",
           "quantity": 50,
           "costBasis": 1982.62,
-          "snapshotPrice": 33.15
+          "snapshotPrice": 32.18
+        },
+        {
+          "ticker": "QLD",
+          "name": "QLD",
+          "type": "ETF",
+          "currency": "USD",
+          "quantity": 1,
+          "costBasis": 66.43,
+          "snapshotPrice": 65.74
+        },
+        {
+          "ticker": "SSO",
+          "name": "SSO",
+          "type": "ETF",
+          "currency": "USD",
+          "quantity": 1,
+          "costBasis": 55.23,
+          "snapshotPrice": 54.74
         },
         {
           "ticker": "498400",

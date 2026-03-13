@@ -77,6 +77,7 @@ const CATEGORY_TICKER_RULES = {
   ],
   "Nasdaq": [
     "QQQ",
+    "QLD",
     "KODEX 미국나스닥100",
     "TIGER 미국나스닥100레버리지(합성)",
     "KODEX 미국반도체",
@@ -84,6 +85,7 @@ const CATEGORY_TICKER_RULES = {
   ],
   "S&P500": [
     "VOO",
+    "SSO",
     "KODEX 미국S&P500",
     "ACE 미국S&P500미국채혼합50액티브",
   ],

@@ -1,6 +1,6 @@
 {
   "provider": "Stock Analysis",
-  "updatedAt": "2026-03-12T11:47:57Z",
+  "updatedAt": "2026-03-13T05:34:39Z",
   "methodology": "Trailing 12-month annual dividend per share shown on Stock Analysis dividend pages.",
   "dividends": {
     "003545": {
@@ -195,6 +195,12 @@
       "currency": "USD",
       "sourceUrl": "https://stockanalysis.com/stocks/o/dividend/"
     },
+    "QLD": {
+      "name": "QLD",
+      "annualDividendPerShare": 0.12,
+      "currency": "USD",
+      "sourceUrl": "https://stockanalysis.com/etf/qld/dividend/"
+    },
     "QQQ": {
       "name": "QQQ",
       "annualDividendPerShare": 2.79,
@@ -206,6 +212,12 @@
       "annualDividendPerShare": 1.05,
       "currency": "USD",
       "sourceUrl": "https://stockanalysis.com/etf/schd/dividend/"
+    },
+    "SSO": {
+      "name": "SSO",
+      "annualDividendPerShare": 0.4,
+      "currency": "USD",
+      "sourceUrl": "https://stockanalysis.com/etf/sso/dividend/"
     },
     "TLT": {
       "name": "TLT",
