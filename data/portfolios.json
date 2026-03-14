@@ -326,7 +326,7 @@
     {
       "id": "direct-investment",
       "name": "직투계좌",
-      "snapshotLabel": "2026년 3월 13일 사용자 제공 수치 기준",
+      "snapshotLabel": "2026년 3월 13일 사용자 제공 수치 기준, 2026년 3월 14일 원화 평균단가 반영",
       "cash": 1813511,
       "cashUsd": 1855.5,
       "snapshotUsdKrw": 1472.18,
@@ -338,6 +338,13 @@
           "currency": "USD",
           "quantity": 1244.643081,
           "costBasis": 33652.33,
+          "averageCostKrw": 38791,
+          "averageCostAdjustment": {
+            "mode": "weighted-sale-history",
+            "soldQuantity": 407.426754,
+            "soldPurchaseAmount": 11404.32,
+            "soldPurchaseAmountKrw": 16148135
+          },
           "snapshotPrice": 30.94
         },
         {
@@ -347,6 +354,13 @@
           "currency": "USD",
           "quantity": 49.162301,
           "costBasis": 25821.57,
+          "averageCostKrw": 752242,
+          "averageCostAdjustment": {
+            "mode": "weighted-sale-history",
+            "soldQuantity": 5,
+            "soldPurchaseAmount": 2529.86,
+            "soldPurchaseAmountKrw": 3526058
+          },
           "snapshotPrice": 598.27
         },
         {
@@ -356,6 +370,13 @@
           "currency": "USD",
           "quantity": 459.260168,
           "costBasis": 25814.46,
+          "averageCostKrw": 81696,
+          "averageCostAdjustment": {
+            "mode": "weighted-sale-history",
+            "soldQuantity": 373,
+            "soldPurchaseAmount": 20427.25,
+            "soldPurchaseAmountKrw": 29152085
+          },
           "snapshotPrice": 56.99
         },
         {
@@ -365,6 +386,13 @@
           "currency": "USD",
           "quantity": 428.242203,
           "costBasis": 24220.84,
+          "averageCostKrw": 81285,
+          "averageCostAdjustment": {
+            "mode": "weighted-sale-history",
+            "soldQuantity": 96,
+            "soldPurchaseAmount": 5690.92,
+            "soldPurchaseAmountKrw": 7846880
+          },
           "snapshotPrice": 57.38
         },
         {
@@ -374,6 +402,13 @@
           "currency": "USD",
           "quantity": 36.711293,
           "costBasis": 20401.62,
+          "averageCostKrw": 796638,
+          "averageCostAdjustment": {
+            "mode": "weighted-sale-history",
+            "soldQuantity": 15,
+            "soldPurchaseAmount": 8134.39,
+            "soldPurchaseAmountKrw": 11529532
+          },
           "snapshotPrice": 614.4
         },
         {
@@ -383,6 +418,7 @@
           "currency": "USD",
           "quantity": 249.590012,
           "costBasis": 14072.53,
+          "averageCostKrw": 80205,
           "snapshotPrice": 64.83
         },
         {
@@ -392,6 +428,7 @@
           "currency": "USD",
           "quantity": 114,
           "costBasis": 11019.81,
+          "averageCostKrw": 138618,
           "snapshotPrice": 95.69
         },
         {
@@ -401,6 +438,7 @@
           "currency": "USD",
           "quantity": 800,
           "costBasis": 8425.8,
+          "averageCostKrw": 15282,
           "snapshotPrice": 10.46
         },
         {
@@ -410,6 +448,7 @@
           "currency": "USD",
           "quantity": 86,
           "costBasis": 7687.29,
+          "averageCostKrw": 127128,
           "snapshotPrice": 86.83
         },
         {
@@ -419,6 +458,13 @@
           "currency": "USD",
           "quantity": 50,
           "costBasis": 1982.62,
+          "averageCostKrw": 58541,
+          "averageCostAdjustment": {
+            "mode": "weighted-sale-history",
+            "soldQuantity": 50,
+            "soldPurchaseAmount": 2895.21,
+            "soldPurchaseAmountKrw": 4030475
+          },
           "snapshotPrice": 32.18
         },
         {
@@ -428,6 +474,10 @@
           "currency": "USD",
           "quantity": 1,
           "costBasis": 66.43,
+          "averageCostKrw": 97680,
+          "averageCostAdjustment": {
+            "mode": "current-average"
+          },
           "snapshotPrice": 65.74
         },
         {
@@ -437,6 +487,7 @@
           "currency": "USD",
           "quantity": 1,
           "costBasis": 55.23,
+          "averageCostKrw": 81339,
           "snapshotPrice": 54.74
         },
         {
