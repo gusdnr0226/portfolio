@@ -326,9 +326,9 @@
     {
       "id": "direct-investment",
       "name": "직투계좌",
-      "snapshotLabel": "2026년 3월 13일 사용자 제공 수치 기준, 2026년 3월 14일 원화 평균단가 반영",
-      "cash": 1813511,
-      "cashUsd": 1855.5,
+      "snapshotLabel": "2026년 3월 17일 사용자 제공 수치 기준, 2026년 3월 13일~17일 추가 매수와 원화/달러 기준 매수금액 반영",
+      "cash": 437941,
+      "cashUsd": 1395.73,
       "snapshotUsdKrw": 1472.18,
       "holdings": [
         {
@@ -336,9 +336,9 @@
           "name": "SCHD",
           "type": "ETF",
           "currency": "USD",
-          "quantity": 1244.643081,
-          "costBasis": 33652.33,
-          "averageCostKrw": 38791,
+          "quantity": 1247.869175,
+          "costBasis": 33752.31,
+          "averageCostKrw": 38811,
           "averageCostAdjustment": {
             "mode": "weighted-sale-history",
             "soldQuantity": 407.426754,
@@ -472,9 +472,9 @@
           "name": "QLD",
           "type": "ETF",
           "currency": "USD",
-          "quantity": 1,
-          "costBasis": 66.43,
-          "averageCostKrw": 97680,
+          "quantity": 4,
+          "costBasis": 265.95,
+          "averageCostKrw": 98668,
           "averageCostAdjustment": {
             "mode": "current-average"
           },
@@ -485,9 +485,9 @@
           "name": "SSO",
           "type": "ETF",
           "currency": "USD",
-          "quantity": 1,
-          "costBasis": 55.23,
-          "averageCostKrw": 81339,
+          "quantity": 4,
+          "costBasis": 220.98,
+          "averageCostKrw": 82016,
           "snapshotPrice": 54.74
         },
         {

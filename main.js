@@ -7,6 +7,7 @@ const GITHUB_LIVE_PRICES_URL =
   `${GITHUB_API_BASE_URL}/contents/data/live-prices.json?ref=main`;
 const LIVE_PRICE_PROXY_BASE_URL = "https://r.jina.ai/http://";
 const YAHOO_SPARK_BASE_URL = "https://query1.finance.yahoo.com/v7/finance/spark";
+const YAHOO_CHART_BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart";
 const YAHOO_SPARK_BATCH_SIZE = 20;
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const AMOUNT_VISIBILITY_STORAGE_KEY = "portfolio.hide-amounts";
@@ -295,6 +296,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
 const state = {
   portfolioSource: null,
   livePriceSource: null,
+  liveExchangeRateSource: null,
   dividendSource: null,
   dividendCalendarSource: null,
   dividendCalendarError: null,
@@ -1087,6 +1089,16 @@ function buildYahooSparkProxyUrl(symbols) {
   return `${LIVE_PRICE_PROXY_BASE_URL}${yahooUrl.toString()}`;
 }
 
+function buildYahooChartProxyUrl(symbol, { range = "1d", interval = "1m" } = {}) {
+  const yahooUrl = new URL(`${YAHOO_CHART_BASE_URL}/${encodeURIComponent(symbol)}`);
+  yahooUrl.searchParams.set("range", range);
+  yahooUrl.searchParams.set("interval", interval);
+  yahooUrl.searchParams.set("includePrePost", "true");
+  yahooUrl.searchParams.set("_", `${Date.now()}`);
+
+  return `${LIVE_PRICE_PROXY_BASE_URL}${yahooUrl.toString()}`;
+}
+
 function getYahooSparkPrice(result) {
   const response = Array.isArray(result?.response) ? result.response[0] : null;
   const metaPrice = response?.meta?.regularMarketPrice;
@@ -1103,6 +1115,29 @@ function getYahooSparkPrice(result) {
 
   for (let index = closePrices.length - 1; index >= 0; index -= 1) {
     if (Number.isFinite(closePrices[index])) {
+      return closePrices[index];
+    }
+  }
+
+  return null;
+}
+
+function getYahooChartPrice(payload) {
+  const result = Array.isArray(payload?.chart?.result) ? payload.chart.result[0] : null;
+  const metaPrice = result?.meta?.regularMarketPrice;
+
+  if (Number.isFinite(metaPrice) && metaPrice > 0) {
+    return metaPrice;
+  }
+
+  const closePrices = result?.indicators?.quote?.[0]?.close;
+
+  if (!Array.isArray(closePrices)) {
+    return null;
+  }
+
+  for (let index = closePrices.length - 1; index >= 0; index -= 1) {
+    if (Number.isFinite(closePrices[index]) && closePrices[index] > 0) {
       return closePrices[index];
     }
   }
@@ -1131,6 +1166,31 @@ async function fetchYahooSparkBatch(symbols) {
     };
     return quotes;
   }, {});
+}
+
+async function fetchYahooIntradayQuote(ticker, { range = "1d", interval = "1m" } = {}) {
+  const symbol = toYahooSymbol(ticker);
+  const payload = extractJsonPayload(
+    await fetchText(buildYahooChartProxyUrl(symbol, { range, interval })),
+  );
+  const price = getYahooChartPrice(payload);
+
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error(`${ticker} 실시간 값을 읽지 못했습니다.`);
+  }
+
+  return normalizeLivePriceSource(
+    {
+      provider: "Yahoo Finance via r.jina.ai",
+      updatedAt: new Date().toISOString(),
+      quotes: {
+        [ticker]: {
+          price,
+        },
+      },
+    },
+    "yahoo-chart-proxy",
+  );
 }
 
 async function fetchLocalLivePrices() {
@@ -1208,6 +1268,14 @@ async function fetchYahooLivePrices(tickers) {
     },
     "yahoo-spark-proxy",
   );
+}
+
+async function loadLiveExchangeRateSource() {
+  try {
+    return await fetchYahooIntradayQuote("KRW=X");
+  } catch (error) {
+    return fetchYahooLivePrices(["KRW=X"]);
+  }
 }
 
 async function loadLivePrices({ includeRepo = false, externalTickers = [] } = {}) {
@@ -1459,7 +1527,27 @@ function getBookUsdKrwRate(book) {
   return portfolioRate ?? 0;
 }
 
-function buildDividendCalendarData(book, source, error = null) {
+function getDividendCalendarExchangeRateMeta(book, exchangeRateSource) {
+  const liveRate = exchangeRateSource?.quotes?.["KRW=X"]?.price;
+
+  if (Number.isFinite(liveRate) && liveRate > 0) {
+    return {
+      usdKrwRate: liveRate,
+      exchangeRateProvider: exchangeRateSource.provider ?? null,
+      exchangeRateUpdatedAt: exchangeRateSource.updatedAt ?? null,
+      usesLiveExchangeRate: true,
+    };
+  }
+
+  return {
+    usdKrwRate: getBookUsdKrwRate(book),
+    exchangeRateProvider: book.livePriceSource?.provider ?? null,
+    exchangeRateUpdatedAt: book.livePriceSource?.updatedAt ?? null,
+    usesLiveExchangeRate: isAutomaticLivePriceSource(book.livePriceSource),
+  };
+}
+
+function buildDividendCalendarData(book, source, error = null, exchangeRateSource = null) {
   const holdingLookup = new Map();
 
   book.portfolios.forEach((portfolio) => {
@@ -1552,7 +1640,8 @@ function buildDividendCalendarData(book, source, error = null) {
       USD: 0,
     },
   );
-  const usdKrwRate = getBookUsdKrwRate(book);
+  const exchangeRateMeta = getDividendCalendarExchangeRateMeta(book, exchangeRateSource);
+  const usdKrwRate = exchangeRateMeta.usdKrwRate;
   const sharedMaxKrw = months.reduce(
     (maximum, monthData) =>
       Math.max(maximum, monthData.totals.KRW + monthData.totals.USD * usdKrwRate),
@@ -1569,6 +1658,9 @@ function buildDividendCalendarData(book, source, error = null) {
     totals,
     maxByCurrency,
     usdKrwRate,
+    exchangeRateProvider: exchangeRateMeta.exchangeRateProvider,
+    exchangeRateUpdatedAt: exchangeRateMeta.exchangeRateUpdatedAt,
+    usesLiveExchangeRate: exchangeRateMeta.usesLiveExchangeRate,
     sharedMaxKrw,
     sharedMaxUsd,
     convertedUsdTotalKrw,
@@ -3274,8 +3366,8 @@ function buildDividendCalendarTooltip(monthData, calendar) {
   return escapeHtml(lines.join("\n"));
 }
 
-function renderDividendCalendarSection(book, source, error = null) {
-  const calendar = buildDividendCalendarData(book, source, error);
+function renderDividendCalendarSection(book, source, error = null, exchangeRateSource = null) {
+  const calendar = buildDividendCalendarData(book, source, error, exchangeRateSource);
   const usdRateCopy =
     calendar.usdKrwRate > 0
       ? `1 USD = ${formatExchangeRate(calendar.usdKrwRate)} 기준으로 외화 구간을 환산해 원화 구간 위에 함께 누적합니다.`
@@ -3283,6 +3375,14 @@ function renderDividendCalendarSection(book, source, error = null) {
   const sectionCopy = error
     ? `배당 캘린더 파일을 읽지 못했습니다: ${error.message}`
     : `월을 바닥 축에 두고, 한 막대 안에 외화 배당을 먼저 쌓고 그 위에 원화 배당을 올립니다. ${usdRateCopy}`;
+  const exchangeRateMeta = calendar.exchangeRateUpdatedAt
+    ? `환율 ${formatUpdatedAt(calendar.exchangeRateUpdatedAt)}`
+    : calendar.usesLiveExchangeRate
+      ? `환율 ${calendar.exchangeRateProvider ?? "실시간"}`
+      : "환율 포트폴리오 기준";
+  const entryMeta = calendar.updatedAt
+    ? `엔트리 ${formatUpdatedAt(calendar.updatedAt)}`
+    : "엔트리 data/dividend-calendar.json";
 
   return `
     <section
@@ -3317,7 +3417,7 @@ function renderDividendCalendarSection(book, source, error = null) {
         <article class="dividend-calendar-stat">
           <span class="dividend-calendar-stat-label">적용 환율 / 엔트리</span>
           <strong class="dividend-calendar-stat-value">${formatExchangeRate(calendar.usdKrwRate)}</strong>
-          <span class="dividend-calendar-stat-sub">${currencyFormatter.format(calendar.populatedEntryCount)} / ${currencyFormatter.format(calendar.entryCount)} · ${calendar.updatedAt ? `업데이트 ${formatUpdatedAt(calendar.updatedAt)}` : "data/dividend-calendar.json에서 관리"}</span>
+          <span class="dividend-calendar-stat-sub">${currencyFormatter.format(calendar.populatedEntryCount)} / ${currencyFormatter.format(calendar.entryCount)} · ${entryMeta} · ${exchangeRateMeta}</span>
         </article>
       </div>
 
@@ -4035,7 +4135,12 @@ function renderApp(book) {
 
           ${renderTreemapSection(treemap)}
 
-          ${renderDividendCalendarSection(book, state.dividendCalendarSource, state.dividendCalendarError)}
+          ${renderDividendCalendarSection(
+            book,
+            state.dividendCalendarSource,
+            state.dividendCalendarError,
+            state.liveExchangeRateSource,
+          )}
 
           ${renderAllHoldingsSection(book)}
 
@@ -4086,14 +4191,27 @@ async function refreshLivePrices() {
   state.refreshError = null;
   state.refreshPhase = "external";
   state.refreshDetail =
-    "Yahoo Finance 시세를 직접 확인하고, 실패하면 저장된 가격 파일을 확인합니다.";
+    "Yahoo Finance 시세와 환율을 직접 확인하고, 실패하면 저장된 가격 파일을 확인합니다.";
   renderCurrentBook();
 
   try {
-    state.livePriceSource = await loadLivePrices({
-      includeRepo: true,
-      externalTickers,
-    });
+    const [livePriceResult, exchangeRateResult] = await Promise.allSettled([
+      loadLivePrices({
+        includeRepo: true,
+        externalTickers,
+      }),
+      loadLiveExchangeRateSource(),
+    ]);
+
+    if (exchangeRateResult.status === "fulfilled") {
+      state.liveExchangeRateSource = exchangeRateResult.value;
+    }
+
+    if (livePriceResult.status === "fulfilled") {
+      state.livePriceSource = livePriceResult.value;
+    } else {
+      throw livePriceResult.reason;
+    }
   } catch (error) {
     state.refreshError = error;
   } finally {
@@ -4131,14 +4249,25 @@ async function initializeApp() {
     }
     const externalTickers = getExternalQuoteTickers(state.portfolioSource);
 
-    try {
-      state.livePriceSource = await loadLivePrices({
+    const [livePriceResult, exchangeRateResult] = await Promise.allSettled([
+      loadLivePrices({
         includeRepo: true,
         externalTickers,
-      });
-    } catch (error) {
+      }),
+      loadLiveExchangeRateSource(),
+    ]);
+
+    if (livePriceResult.status === "fulfilled") {
+      state.livePriceSource = livePriceResult.value;
+    } else {
       state.livePriceSource = null;
-      state.refreshError = error;
+      state.refreshError = livePriceResult.reason;
+    }
+
+    if (exchangeRateResult.status === "fulfilled") {
+      state.liveExchangeRateSource = exchangeRateResult.value;
+    } else {
+      state.liveExchangeRateSource = null;
     }
 
     renderApp(buildBookData(state.portfolioSource, state.livePriceSource, state.dividendSource));
