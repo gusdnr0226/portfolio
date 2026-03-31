@@ -2154,6 +2154,16 @@ tfoot td {
 
   .all-holdings-table tbody td:nth-child(8)::before,
   .all-holdings-table tfoot td:nth-child(8)::before {
+    content: "실현손익";
+  }
+
+  .all-holdings-table tbody td:nth-child(9)::before,
+  .all-holdings-table tfoot td:nth-child(9)::before {
+    content: "누적배당";
+  }
+
+  .all-holdings-table tbody td:nth-child(10)::before,
+  .all-holdings-table tfoot td:nth-child(10)::before {
     content: "비중";
   }
 

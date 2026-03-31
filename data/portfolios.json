@@ -15,7 +15,9 @@
           "type": "ETF",
           "quantity": 321,
           "costBasis": 6088520,
-          "snapshotPrice": 22495
+          "snapshotPrice": 22495,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 123551
         },
         {
           "ticker": "493420",
@@ -23,7 +25,9 @@
           "type": "ETF",
           "quantity": 580,
           "costBasis": 6163390,
-          "snapshotPrice": 12390
+          "snapshotPrice": 12390,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 164136
         },
         {
           "ticker": "379810",
@@ -31,7 +35,9 @@
           "type": "ETF",
           "quantity": 172,
           "costBasis": 4054556,
-          "snapshotPrice": 24080
+          "snapshotPrice": 24080,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 0
         }
       ]
     },
@@ -47,7 +53,9 @@
           "type": "ETF",
           "quantity": 938,
           "costBasis": 21334610,
-          "snapshotPrice": 22495
+          "snapshotPrice": 22495,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 131642
         },
         {
           "ticker": "0144L0",
@@ -55,7 +63,9 @@
           "type": "ETF",
           "quantity": 1000,
           "costBasis": 9927070,
-          "snapshotPrice": 9320
+          "snapshotPrice": 9320,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 191000
         },
         {
           "ticker": "379810",
@@ -63,7 +73,9 @@
           "type": "ETF",
           "quantity": 259,
           "costBasis": 6429270,
-          "snapshotPrice": 24080
+          "snapshotPrice": 24080,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 17000
         },
         {
           "ticker": "088980",
@@ -71,7 +83,9 @@
           "type": "인프라",
           "quantity": 138,
           "costBasis": 1562420,
-          "snapshotPrice": 11240
+          "snapshotPrice": 11240,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 0
         }
       ]
     },
@@ -87,7 +101,9 @@
           "type": "ETF",
           "quantity": 526,
           "costBasis": 6237720,
-          "snapshotPrice": 13300
+          "snapshotPrice": 13300,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 255474
         }
       ]
     },
@@ -103,7 +119,9 @@
           "type": "혼합형",
           "quantity": 490,
           "costBasis": 6058100,
-          "snapshotPrice": 15400
+          "snapshotPrice": 15400,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 252510
         },
         {
           "ticker": "088980",
@@ -111,7 +129,9 @@
           "type": "인프라",
           "quantity": 643,
           "costBasis": 7350687,
-          "snapshotPrice": 11240
+          "snapshotPrice": 11240,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 679440
         },
         {
           "ticker": "458730",
@@ -119,7 +139,9 @@
           "type": "ETF",
           "quantity": 367,
           "costBasis": 4497920,
-          "snapshotPrice": 14540
+          "snapshotPrice": 14540,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 167188
         },
         {
           "ticker": "415640",
@@ -127,7 +149,9 @@
           "type": "인프라",
           "quantity": 248,
           "costBasis": 1985850,
-          "snapshotPrice": 10020
+          "snapshotPrice": 10020,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 230100
         },
         {
           "ticker": "458760",
@@ -136,7 +160,9 @@
           "quantity": 139,
           "costBasis": 1491025,
           "snapshotPrice": 11220,
-          "nameInferred": true
+          "nameInferred": true,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 164526
         },
         {
           "ticker": "441640",
@@ -145,7 +171,9 @@
           "quantity": 37,
           "costBasis": 445245,
           "snapshotPrice": 12810,
-          "nameInferred": true
+          "nameInferred": true,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 23867
         }
       ]
     },
@@ -161,7 +189,9 @@
           "type": "ETF",
           "quantity": 101,
           "costBasis": 2092821,
-          "snapshotPrice": 24080
+          "snapshotPrice": 24080,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 22523
         },
         {
           "ticker": "390390",
@@ -169,7 +199,9 @@
           "type": "ETF",
           "quantity": 27,
           "costBasis": 983826,
-          "snapshotPrice": 37900
+          "snapshotPrice": 37900,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 1620
         },
         {
           "ticker": "438080",
@@ -178,7 +210,9 @@
           "quantity": 69,
           "costBasis": 897966,
           "snapshotPrice": 13995,
-          "nameInferred": true
+          "nameInferred": true,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 0
         },
         {
           "ticker": "0038A0",
@@ -187,7 +221,9 @@
           "quantity": 60,
           "costBasis": 986100,
           "snapshotPrice": 15545,
-          "nameInferred": true
+          "nameInferred": true,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 0
         }
       ]
     },
@@ -203,7 +239,9 @@
           "type": "주식",
           "quantity": 249,
           "costBasis": 13308303,
-          "snapshotPrice": 75800
+          "snapshotPrice": 75800,
+          "realizedProfitLossKrw": -148169,
+          "cumulativeDividendIncomeKrw": 285710
         },
         {
           "ticker": "458760",
@@ -212,7 +250,9 @@
           "quantity": 1376,
           "costBasis": 13870080,
           "snapshotPrice": 11220,
-          "nameInferred": true
+          "nameInferred": true,
+          "realizedProfitLossKrw": -81448,
+          "cumulativeDividendIncomeKrw": 1401630
         },
         {
           "ticker": "005385",
@@ -220,7 +260,9 @@
           "type": "우선주",
           "quantity": 51,
           "costBasis": 10531500,
-          "snapshotPrice": 253500
+          "snapshotPrice": 253500,
+          "realizedProfitLossKrw": 1932934,
+          "cumulativeDividendIncomeKrw": 190370
         },
         {
           "ticker": "088980",
@@ -228,7 +270,9 @@
           "type": "인프라",
           "quantity": 1010,
           "costBasis": 11719030,
-          "snapshotPrice": 11240
+          "snapshotPrice": 11240,
+          "realizedProfitLossKrw": 260391,
+          "cumulativeDividendIncomeKrw": 895280
         },
         {
           "ticker": "086790",
@@ -236,7 +280,9 @@
           "type": "주식",
           "quantity": 90,
           "costBasis": 8286570,
-          "snapshotPrice": 107900
+          "snapshotPrice": 107900,
+          "realizedProfitLossKrw": 1365154,
+          "cumulativeDividendIncomeKrw": 201438
         },
         {
           "ticker": "458730",
@@ -244,7 +290,9 @@
           "type": "ETF",
           "quantity": 597,
           "costBasis": 7799805,
-          "snapshotPrice": 14540
+          "snapshotPrice": 14540,
+          "realizedProfitLossKrw": 906828,
+          "cumulativeDividendIncomeKrw": 185063
         },
         {
           "ticker": "441640",
@@ -253,7 +301,9 @@
           "quantity": 506,
           "costBasis": 6495522,
           "snapshotPrice": 12810,
-          "nameInferred": true
+          "nameInferred": true,
+          "realizedProfitLossKrw": 290690,
+          "cumulativeDividendIncomeKrw": 249939
         },
         {
           "ticker": "005389",
@@ -261,7 +311,9 @@
           "type": "우선주",
           "quantity": 24,
           "costBasis": 5145000,
-          "snapshotPrice": 239000
+          "snapshotPrice": 239000,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 0
         },
         {
           "ticker": "0098N0",
@@ -269,7 +321,9 @@
           "type": "ETF",
           "quantity": 407,
           "costBasis": 4525840,
-          "snapshotPrice": 12400
+          "snapshotPrice": 12400,
+          "realizedProfitLossKrw": 414890,
+          "cumulativeDividendIncomeKrw": 91575
         },
         {
           "ticker": "476800",
@@ -278,7 +332,9 @@
           "quantity": 883,
           "costBasis": 4282550,
           "snapshotPrice": 4770,
-          "nameInferred": true
+          "nameInferred": true,
+          "realizedProfitLossKrw": 70575,
+          "cumulativeDividendIncomeKrw": 144684
         },
         {
           "ticker": "316140",
@@ -286,7 +342,9 @@
           "type": "주식",
           "quantity": 105,
           "costBasis": 2890125,
-          "snapshotPrice": 31550
+          "snapshotPrice": 31550,
+          "realizedProfitLossKrw": 1228771,
+          "cumulativeDividendIncomeKrw": 136620
         },
         {
           "ticker": "003545",
@@ -294,7 +352,9 @@
           "type": "우선주",
           "quantity": 125,
           "costBasis": 2600000,
-          "snapshotPrice": 25100
+          "snapshotPrice": 25100,
+          "realizedProfitLossKrw": 650210,
+          "cumulativeDividendIncomeKrw": 156250
         },
         {
           "ticker": "418660",
@@ -302,7 +362,9 @@
           "type": "ETF",
           "quantity": 116,
           "costBasis": 3798188,
-          "snapshotPrice": 33085
+          "snapshotPrice": 33085,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 0
         },
         {
           "ticker": "0052D0",
@@ -311,7 +373,9 @@
           "quantity": 142,
           "costBasis": 1921970,
           "snapshotPrice": 15390,
-          "nameInferred": true
+          "nameInferred": true,
+          "realizedProfitLossKrw": 200239,
+          "cumulativeDividendIncomeKrw": 60436
         },
         {
           "ticker": "415640",
@@ -319,7 +383,9 @@
           "type": "인프라",
           "quantity": 200,
           "costBasis": 1944000,
-          "snapshotPrice": 10020
+          "snapshotPrice": 10020,
+          "realizedProfitLossKrw": 426941,
+          "cumulativeDividendIncomeKrw": 130000
         },
         {
           "ticker": "024110",
@@ -327,7 +393,9 @@
           "type": "주식",
           "quantity": 71,
           "costBasis": 1480350,
-          "snapshotPrice": 22800
+          "snapshotPrice": 22800,
+          "realizedProfitLossKrw": 460600,
+          "cumulativeDividendIncomeKrw": 75615
         }
       ]
     },
@@ -347,7 +415,9 @@
           "quantity": 1264.174772,
           "costBasis": 34252.33,
           "averageCostKrw": 38893,
-          "snapshotPrice": 30.94
+          "snapshotPrice": 30.94,
+          "realizedProfitLossKrw": 240573,
+          "cumulativeDividendIncomeKrw": 1566621
         },
         {
           "ticker": "QQQ",
@@ -357,7 +427,9 @@
           "quantity": 49.162301,
           "costBasis": 25821.57,
           "averageCostKrw": 752242,
-          "snapshotPrice": 598.27
+          "snapshotPrice": 598.27,
+          "realizedProfitLossKrw": 315851,
+          "cumulativeDividendIncomeKrw": 158685
         },
         {
           "ticker": "JEPQ",
@@ -367,7 +439,9 @@
           "quantity": 459.260168,
           "costBasis": 25814.46,
           "averageCostKrw": 81696,
-          "snapshotPrice": 56.99
+          "snapshotPrice": 56.99,
+          "realizedProfitLossKrw": 3020162,
+          "cumulativeDividendIncomeKrw": 3366089
         },
         {
           "ticker": "JEPI",
@@ -377,7 +451,9 @@
           "quantity": 428.242203,
           "costBasis": 24220.84,
           "averageCostKrw": 81285,
-          "snapshotPrice": 57.38
+          "snapshotPrice": 57.38,
+          "realizedProfitLossKrw": 359696,
+          "cumulativeDividendIncomeKrw": 2468266
         },
         {
           "ticker": "VOO",
@@ -387,7 +463,9 @@
           "quantity": 36.711293,
           "costBasis": 20401.62,
           "averageCostKrw": 796638,
-          "snapshotPrice": 614.4
+          "snapshotPrice": 614.4,
+          "realizedProfitLossKrw": 1826501,
+          "cumulativeDividendIncomeKrw": 264983
         },
         {
           "ticker": "O",
@@ -397,7 +475,9 @@
           "quantity": 249.590012,
           "costBasis": 14072.53,
           "averageCostKrw": 80205,
-          "snapshotPrice": 64.83
+          "snapshotPrice": 64.83,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 845622
         },
         {
           "ticker": "IEF",
@@ -407,7 +487,9 @@
           "quantity": 114,
           "costBasis": 11019.81,
           "averageCostKrw": 138618,
-          "snapshotPrice": 95.69
+          "snapshotPrice": 95.69,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 231455
         },
         {
           "ticker": "AGNC",
@@ -417,7 +499,9 @@
           "quantity": 850,
           "costBasis": 8918.3,
           "averageCostKrw": 15252,
-          "snapshotPrice": 10.46
+          "snapshotPrice": 10.46,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 419731
         },
         {
           "ticker": "TLT",
@@ -427,7 +511,9 @@
           "quantity": 86,
           "costBasis": 7687.29,
           "averageCostKrw": 127128,
-          "snapshotPrice": 86.83
+          "snapshotPrice": 86.83,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 208320
         },
         {
           "ticker": "ULTY",
@@ -437,7 +523,9 @@
           "quantity": 50,
           "costBasis": 1982.62,
           "averageCostKrw": 58541,
-          "snapshotPrice": 32.18
+          "snapshotPrice": 32.18,
+          "realizedProfitLossKrw": -1130921,
+          "cumulativeDividendIncomeKrw": 1218170
         },
         {
           "ticker": "QLD",
@@ -447,7 +535,9 @@
           "quantity": 14,
           "costBasis": 889.42,
           "averageCostKrw": 94983,
-          "snapshotPrice": 65.74
+          "snapshotPrice": 65.74,
+          "realizedProfitLossKrw": 58941,
+          "cumulativeDividendIncomeKrw": 151
         },
         {
           "ticker": "SSO",
@@ -457,7 +547,9 @@
           "quantity": 14,
           "costBasis": 743.68,
           "averageCostKrw": 79432,
-          "snapshotPrice": 54.74
+          "snapshotPrice": 54.74,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 1316
         },
         {
           "ticker": "498400",
@@ -465,7 +557,9 @@
           "type": "ETF",
           "quantity": 600,
           "costBasis": 8875500,
-          "snapshotPrice": 17500
+          "snapshotPrice": 17500,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 261910
         },
         {
           "ticker": "488770",
@@ -473,7 +567,9 @@
           "type": "ETF",
           "quantity": 60,
           "costBasis": 6211410,
-          "snapshotPrice": 103765
+          "snapshotPrice": 103765,
+          "realizedProfitLossKrw": 0,
+          "cumulativeDividendIncomeKrw": 0
         }
       ]
     }

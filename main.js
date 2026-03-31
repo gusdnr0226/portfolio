@@ -719,6 +719,18 @@ function formatProfitWithRateCompact(profitLoss, profitRate) {
   return `${formatSignedCurrency(profitLoss)}(${formatSignedPercentCompact(profitRate)})`;
 }
 
+function calculateTotalReturnAmount(unrealizedProfitLoss, realizedProfitLoss, cumulativeDividendIncome) {
+  return unrealizedProfitLoss + realizedProfitLoss + cumulativeDividendIncome;
+}
+
+function calculateTotalReturnRate(totalReturnAmount, costBasis) {
+  if (costBasis === 0) {
+    return 0;
+  }
+
+  return totalReturnAmount / costBasis;
+}
+
 function formatCashBreakdown(cashKrw, cashUsd) {
   const parts = [];
 
@@ -1263,8 +1275,16 @@ function buildPortfolioData(source, livePriceSource, dividendSource) {
       currency,
       usdKrwRate,
     );
+    const realizedProfitLossKrw = Number(holding.realizedProfitLossKrw ?? 0);
+    const cumulativeDividendIncomeKrw = Number(holding.cumulativeDividendIncomeKrw ?? 0);
     const profitRate = holding.costBasis === 0 ? 0 : profitLoss / holding.costBasis;
     const profitRateBase = costBasisBase === 0 ? 0 : profitLossBase / costBasisBase;
+    const totalReturnAmount = calculateTotalReturnAmount(
+      profitLossBase,
+      realizedProfitLossKrw,
+      cumulativeDividendIncomeKrw,
+    );
+    const totalReturnRate = calculateTotalReturnRate(totalReturnAmount, costBasisBase);
     const useKrwProfitDisplay = Number.isFinite(averageCostKrw);
 
     return {
@@ -1280,10 +1300,14 @@ function buildPortfolioData(source, livePriceSource, dividendSource) {
       annualDividendPerShare,
       annualDividendIncome,
       annualDividendIncomeBase,
+      realizedProfitLossKrw,
+      cumulativeDividendIncomeKrw,
       profitRate,
       profitRateDisplay: useKrwProfitDisplay ? profitRateBase : profitRate,
       profitLossDisplay: useKrwProfitDisplay ? profitLossBase : profitLoss,
       profitLossDisplayCurrency: useKrwProfitDisplay ? "KRW" : currency,
+      totalReturnAmount,
+      totalReturnRate,
       averageCost,
       averageCostCurrency,
       averageCostKrw,
@@ -1304,6 +1328,8 @@ function buildPortfolioData(source, livePriceSource, dividendSource) {
       accumulator.costBasis += holding.costBasisBase;
       accumulator.profitLoss += holding.profitLossBase;
       accumulator.annualDividendIncome += holding.annualDividendIncomeBase;
+      accumulator.realizedProfitLoss += holding.realizedProfitLossKrw;
+      accumulator.cumulativeDividendIncome += holding.cumulativeDividendIncomeKrw;
       return accumulator;
     },
     {
@@ -1312,6 +1338,8 @@ function buildPortfolioData(source, livePriceSource, dividendSource) {
       costBasis: 0,
       profitLoss: 0,
       annualDividendIncome: 0,
+      realizedProfitLoss: 0,
+      cumulativeDividendIncome: 0,
     },
   );
 
@@ -1319,6 +1347,12 @@ function buildPortfolioData(source, livePriceSource, dividendSource) {
   const investedWeight = totalAssets === 0 ? 0 : totals.marketValue / totalAssets;
   const cashWeight = totalAssets === 0 ? 0 : cashBase / totalAssets;
   const totalReturn = totals.costBasis === 0 ? 0 : totals.profitLoss / totals.costBasis;
+  const totalReturnAmount = calculateTotalReturnAmount(
+    totals.profitLoss,
+    totals.realizedProfitLoss,
+    totals.cumulativeDividendIncome,
+  );
+  const totalReturnRate = calculateTotalReturnRate(totalReturnAmount, totals.costBasis);
 
   const holdingsWithWeight = enrichedHoldings.map((holding) => ({
     ...holding,
@@ -1341,6 +1375,8 @@ function buildPortfolioData(source, livePriceSource, dividendSource) {
       investedWeight,
       cashWeight,
       totalReturn,
+      totalReturnAmount,
+      totalReturnRate,
     },
   };
 }
@@ -1365,6 +1401,8 @@ function buildBookData(source, livePriceSource, dividendSource) {
       accumulator.cashKrw += portfolio.cash;
       accumulator.cashUsd += portfolio.cashUsd;
       accumulator.annualDividendIncome += portfolio.totals.annualDividendIncome;
+      accumulator.realizedProfitLoss += portfolio.totals.realizedProfitLoss;
+      accumulator.cumulativeDividendIncome += portfolio.totals.cumulativeDividendIncome;
       accumulator.holdingsCount += portfolio.holdings.length;
       return accumulator;
     },
@@ -1377,12 +1415,23 @@ function buildBookData(source, livePriceSource, dividendSource) {
       cashKrw: 0,
       cashUsd: 0,
       annualDividendIncome: 0,
+      realizedProfitLoss: 0,
+      cumulativeDividendIncome: 0,
       holdingsCount: 0,
     },
   );
 
   overview.totalReturn =
     overview.costBasis === 0 ? 0 : overview.profitLoss / overview.costBasis;
+  overview.totalReturnAmount = calculateTotalReturnAmount(
+    overview.profitLoss,
+    overview.realizedProfitLoss,
+    overview.cumulativeDividendIncome,
+  );
+  overview.totalReturnRate = calculateTotalReturnRate(
+    overview.totalReturnAmount,
+    overview.costBasis,
+  );
 
   return {
     meta: source.meta,
@@ -1583,8 +1632,12 @@ function buildAccountSummaryGroups(book) {
     ...group,
     totalAssets: 0,
     costBasis: 0,
+    investedCostBasis: 0,
     profitLoss: 0,
+    totalReturnAmount: 0,
     annualDividendIncome: 0,
+    realizedProfitLoss: 0,
+    cumulativeDividendIncome: 0,
     accounts: [],
   }));
   const groupLookup = new Map(groups.map((group) => [group.key, group]));
@@ -1599,8 +1652,12 @@ function buildAccountSummaryGroups(book) {
     const group = groupLookup.get(groupKey);
     group.totalAssets += portfolio.totals.totalAssets;
     group.costBasis += portfolio.totals.costBasis + portfolio.cashBase;
+    group.investedCostBasis += portfolio.totals.costBasis;
     group.profitLoss += portfolio.totals.profitLoss;
+    group.totalReturnAmount += portfolio.totals.totalReturnAmount;
     group.annualDividendIncome += portfolio.totals.annualDividendIncome;
+    group.realizedProfitLoss += portfolio.totals.realizedProfitLoss;
+    group.cumulativeDividendIncome += portfolio.totals.cumulativeDividendIncome;
     group.accounts.push(portfolio.name);
   });
 
@@ -1621,6 +1678,8 @@ function buildAccountSummaryGroups(book) {
       (group.annualDividendIncome -
         (group.key === "direct-investment" ? group.annualDividendIncome * 0.15 : 0)) / 12,
     profitRate: group.costBasis === 0 ? 0 : group.profitLoss / group.costBasis,
+    totalReturnRate:
+      group.investedCostBasis === 0 ? 0 : group.totalReturnAmount / group.investedCostBasis,
     weight: book.overview.totalAssets === 0 ? 0 : group.totalAssets / book.overview.totalAssets,
     barScale: maxAssets === 0 ? 0 : group.totalAssets / maxAssets,
   }));
@@ -1722,6 +1781,8 @@ function buildTreemapData(book) {
         costBasisBase: 0,
         profitLossBase: 0,
         annualDividendIncomeBase: 0,
+        realizedProfitLossKrw: 0,
+        cumulativeDividendIncomeKrw: 0,
         accountNames: new Set(),
       };
 
@@ -1729,6 +1790,8 @@ function buildTreemapData(book) {
       existingAsset.costBasisBase += holding.costBasisBase;
       existingAsset.profitLossBase += holding.profitLossBase;
       existingAsset.annualDividendIncomeBase += holding.annualDividendIncomeBase;
+      existingAsset.realizedProfitLossKrw += holding.realizedProfitLossKrw;
+      existingAsset.cumulativeDividendIncomeKrw += holding.cumulativeDividendIncomeKrw;
       existingAsset.accountNames.add(portfolio.name);
       assetMap.set(key, existingAsset);
     });
@@ -1744,6 +1807,8 @@ function buildTreemapData(book) {
         costBasisBase: 0,
         profitLossBase: 0,
         annualDividendIncomeBase: 0,
+        realizedProfitLossKrw: 0,
+        cumulativeDividendIncomeKrw: 0,
         accountNames: new Set(),
       };
 
@@ -1764,6 +1829,8 @@ function buildTreemapData(book) {
         costBasisBase: 0,
         profitLossBase: 0,
         annualDividendIncomeBase: 0,
+        realizedProfitLossKrw: 0,
+        cumulativeDividendIncomeKrw: 0,
         accountNames: new Set(),
       };
 
@@ -1804,6 +1871,8 @@ function buildTreemapData(book) {
       costBasisBase: 0,
       profitLossBase: 0,
       annualDividendIncomeBase: 0,
+      realizedProfitLossKrw: 0,
+      cumulativeDividendIncomeKrw: 0,
       categories: new Map(),
     };
     const existingCategory = existingSuperCategory.categories.get(asset.category) ?? {
@@ -1814,6 +1883,8 @@ function buildTreemapData(book) {
       costBasisBase: 0,
       profitLossBase: 0,
       annualDividendIncomeBase: 0,
+      realizedProfitLossKrw: 0,
+      cumulativeDividendIncomeKrw: 0,
       assets: [],
     };
 
@@ -1821,11 +1892,15 @@ function buildTreemapData(book) {
     existingCategory.costBasisBase += asset.costBasisBase;
     existingCategory.profitLossBase += asset.profitLossBase;
     existingCategory.annualDividendIncomeBase += asset.annualDividendIncomeBase;
+    existingCategory.realizedProfitLossKrw += asset.realizedProfitLossKrw;
+    existingCategory.cumulativeDividendIncomeKrw += asset.cumulativeDividendIncomeKrw;
     existingCategory.assets.push(asset);
     existingSuperCategory.marketValueBase += asset.marketValueBase;
     existingSuperCategory.costBasisBase += asset.costBasisBase;
     existingSuperCategory.profitLossBase += asset.profitLossBase;
     existingSuperCategory.annualDividendIncomeBase += asset.annualDividendIncomeBase;
+    existingSuperCategory.realizedProfitLossKrw += asset.realizedProfitLossKrw;
+    existingSuperCategory.cumulativeDividendIncomeKrw += asset.cumulativeDividendIncomeKrw;
     existingSuperCategory.categories.set(asset.category, existingCategory);
     superCategoryMap.set(asset.superCategory, existingSuperCategory);
   });
@@ -2630,10 +2705,10 @@ function renderSummaryCards(portfolio) {
       tone: "",
     },
     {
-      label: "평가손익",
-      value: formatSignedCurrency(portfolio.totals.profitLoss),
-      detail: `보유 종목 기준 ${formatSignedPercent(portfolio.totals.totalReturn)}`,
-      tone: getToneClass(portfolio.totals.profitLoss),
+      label: "Total Return",
+      value: formatSignedCurrency(portfolio.totals.totalReturnAmount),
+      detail: `미실현손익 + 실현손익 + 누적배당 ${formatSignedPercent(portfolio.totals.totalReturnRate)}`,
+      tone: getToneClass(portfolio.totals.totalReturnAmount),
     },
     {
       label: "현금",
@@ -2641,6 +2716,18 @@ function renderSummaryCards(portfolio) {
       detail: portfolio.cashUsd > 0 && cashBreakdown
         ? `${cashBreakdown} · 비중 ${formatPercent(portfolio.totals.cashWeight)}`
         : `비중 ${formatPercent(portfolio.totals.cashWeight)}`,
+      tone: "",
+    },
+    {
+      label: "실현손익",
+      value: formatSignedCurrency(portfolio.totals.realizedProfitLoss),
+      detail: "계좌 원장 누적 기준",
+      tone: getToneClass(portfolio.totals.realizedProfitLoss),
+    },
+    {
+      label: "누적 배당수익",
+      value: formatCurrency(portfolio.totals.cumulativeDividendIncome),
+      detail: "계좌 원장 누적 기준",
       tone: "",
     },
     {
@@ -2674,10 +2761,10 @@ function renderBookSummaryCards(book) {
       tone: "",
     },
     {
-      label: "전체 평가손익",
-      value: formatSignedCurrency(book.overview.profitLoss),
-      detail: `전체 계좌 기준 ${formatSignedPercent(book.overview.totalReturn)}`,
-      tone: getToneClass(book.overview.profitLoss),
+      label: "전체 Total Return",
+      value: formatSignedCurrency(book.overview.totalReturnAmount),
+      detail: `전체 계좌 기준 ${formatSignedPercent(book.overview.totalReturnRate)}`,
+      tone: getToneClass(book.overview.totalReturnAmount),
     },
     {
       label: "전체 현금",
@@ -2685,6 +2772,18 @@ function renderBookSummaryCards(book) {
       detail: book.overview.cashUsd > 0 && cashBreakdown
         ? `${cashBreakdown} · ${book.portfolios.length}개 계좌 운영`
         : `${book.portfolios.length}개 계좌 운영`,
+      tone: "",
+    },
+    {
+      label: "전체 실현손익",
+      value: formatSignedCurrency(book.overview.realizedProfitLoss),
+      detail: "계좌 원장 누적 기준",
+      tone: getToneClass(book.overview.realizedProfitLoss),
+    },
+    {
+      label: "누적 배당수익",
+      value: formatCurrency(book.overview.cumulativeDividendIncome),
+      detail: "계좌 원장 누적 기준",
       tone: "",
     },
     {
@@ -2761,6 +2860,8 @@ function buildAggregatedHoldings(book) {
       annualDividendPerShare: 0,
       annualDividendIncome: 0,
       annualDividendIncomeBase: 0,
+      realizedProfitLossKrw: 0,
+      cumulativeDividendIncomeKrw: 0,
       averageCostKrwTotal: 0,
       averageCostKrwQuantity: 0,
       accountNames: new Set(),
@@ -2794,6 +2895,8 @@ function buildAggregatedHoldings(book) {
         annualDividendPerShare: 0,
         annualDividendIncome: 0,
         annualDividendIncomeBase: 0,
+        realizedProfitLossKrw: 0,
+        cumulativeDividendIncomeKrw: 0,
         averageCostKrwTotal: 0,
         averageCostKrwQuantity: 0,
         accountNames: new Set(),
@@ -2811,6 +2914,8 @@ function buildAggregatedHoldings(book) {
       existingHolding.annualDividendPerShare = holding.annualDividendPerShare;
       existingHolding.annualDividendIncome += holding.annualDividendIncome;
       existingHolding.annualDividendIncomeBase += holding.annualDividendIncomeBase;
+      existingHolding.realizedProfitLossKrw += Number(holding.realizedProfitLossKrw ?? 0);
+      existingHolding.cumulativeDividendIncomeKrw += Number(holding.cumulativeDividendIncomeKrw ?? 0);
       if (Number.isFinite(holding.averageCostKrw)) {
         existingHolding.averageCostKrwTotal += holding.averageCostKrw * holding.quantity;
         existingHolding.averageCostKrwQuantity += holding.quantity;
@@ -2859,6 +2964,15 @@ function buildAggregatedHoldings(book) {
         holding.type === "현금" || holding.costBasis === 0
           ? 0
           : holding.profitLoss / holding.costBasis;
+      const totalReturnAmount = calculateTotalReturnAmount(
+        holding.profitLossBase,
+        holding.realizedProfitLossKrw,
+        holding.cumulativeDividendIncomeKrw,
+      );
+      const totalReturnRate =
+        holding.type === "현금"
+          ? 0
+          : calculateTotalReturnRate(totalReturnAmount, holding.costBasisBase);
       const useKrwProfitDisplay = averageCostKrw !== null;
 
       return {
@@ -2875,6 +2989,8 @@ function buildAggregatedHoldings(book) {
         profitRateDisplay: useKrwProfitDisplay ? profitRateBase : profitRate,
         profitLossDisplay: useKrwProfitDisplay ? holding.profitLossBase : holding.profitLoss,
         profitLossDisplayCurrency: useKrwProfitDisplay ? "KRW" : holding.currency,
+        totalReturnAmount,
+        totalReturnRate,
         assetWeight:
           book.overview.totalAssets === 0 ? 0 : holding.marketValueBase / book.overview.totalAssets,
         priceSource: holding.type === "현금" ? "cash" : getAggregatePriceSource(holding.priceSources),
@@ -2918,6 +3034,8 @@ function buildPortfolioCircleGroups(treemap) {
         costBasisBase: 0,
         dividendIncomeBase: 0,
         profitLossBase: 0,
+        realizedProfitLossKrw: 0,
+        cumulativeDividendIncomeKrw: 0,
         members: new Set(),
         assetMap: new Map(),
       },
@@ -2937,6 +3055,8 @@ function buildPortfolioCircleGroups(treemap) {
       group.costBasisBase += category.costBasisBase;
       group.dividendIncomeBase += category.annualDividendIncomeBase;
       group.profitLossBase += category.profitLossBase;
+      group.realizedProfitLossKrw += category.realizedProfitLossKrw;
+      group.cumulativeDividendIncomeKrw += category.cumulativeDividendIncomeKrw;
       group.members.add(category.name);
 
       category.assets.forEach((asset) => {
@@ -2978,10 +3098,22 @@ function buildPortfolioCircleGroups(treemap) {
         detail = "MM, USD, KRW";
       }
 
+      const totalReturnAmount = calculateTotalReturnAmount(
+        resolvedGroup.profitLossBase,
+        resolvedGroup.realizedProfitLossKrw,
+        resolvedGroup.cumulativeDividendIncomeKrw,
+      );
+      const totalReturnRate = calculateTotalReturnRate(
+        totalReturnAmount,
+        resolvedGroup.costBasisBase,
+      );
+
       return {
         ...resolvedGroup,
         members,
         detail,
+        totalReturnAmount,
+        totalReturnRate,
         weight:
           treemap.totalAssets === 0 ? 0 : resolvedGroup.marketValueBase / treemap.totalAssets,
       };
@@ -3075,7 +3207,16 @@ function renderPortfolioCircleChart(treemap) {
   const totalDividendYield =
     treemap.totalAssets === 0 ? 0 : totalDividendIncome / treemap.totalAssets;
   const totalProfitLoss = sortedGroups.reduce((sum, group) => sum + group.profitLossBase, 0);
-  const totalReturn = totalCostBasis === 0 ? 0 : totalProfitLoss / totalCostBasis;
+  const totalRealizedProfitLoss =
+    sortedGroups.reduce((sum, group) => sum + group.realizedProfitLossKrw, 0);
+  const totalCumulativeDividendIncome =
+    sortedGroups.reduce((sum, group) => sum + group.cumulativeDividendIncomeKrw, 0);
+  const totalReturnAmount = calculateTotalReturnAmount(
+    totalProfitLoss,
+    totalRealizedProfitLoss,
+    totalCumulativeDividendIncome,
+  );
+  const totalReturnRate = calculateTotalReturnRate(totalReturnAmount, totalCostBasis);
   const valueChartAriaLabel = sortedGroups
     .map((group) => `${group.label} ${formatPercent(group.weight)}`)
     .join(", ");
@@ -3102,6 +3243,7 @@ function renderPortfolioCircleChart(treemap) {
             chartLabel: `포트폴리오 평가금액 원형 차트: ${valueChartAriaLabel}`,
             segments,
             summaryValue: formatCurrency(treemap.totalAssets),
+            summaryNote: `TR ${formatSignedPercent(totalReturnRate)}`,
           })}
           ${renderPortfolioCirclePlot({
             title: "Dividend",
@@ -3135,7 +3277,7 @@ function renderPortfolioCircleChart(treemap) {
                       </div>
                       <div class="portfolio-circle-cell portfolio-circle-value">
                         <strong>${formatCurrency(group.marketValueBase)}</strong>
-                        <span class="portfolio-circle-value-sub ${getToneClass(group.profitLossBase)}">${formatProfitWithRate(group.profitLossBase, group.costBasisBase)}</span>
+                        <span class="portfolio-circle-value-sub ${getToneClass(group.totalReturnAmount)}">TR ${formatProfitWithRate(group.totalReturnAmount, group.costBasisBase)}</span>
                       </div>
                       <div class="portfolio-circle-cell portfolio-circle-dividend">
                         <strong>${formatCurrency(group.dividendIncomeBase)}</strong>
@@ -3156,7 +3298,7 @@ function renderPortfolioCircleChart(treemap) {
               </div>
               <div class="portfolio-circle-cell portfolio-circle-value">
                 <strong>${formatCurrency(treemap.totalAssets)}</strong>
-                <span class="portfolio-circle-value-sub ${getToneClass(totalProfitLoss)}">${formatProfitWithRate(totalProfitLoss, totalCostBasis)}</span>
+                <span class="portfolio-circle-value-sub ${getToneClass(totalReturnAmount)}">TR ${formatProfitWithRate(totalReturnAmount, totalCostBasis)}</span>
               </div>
               <div class="portfolio-circle-cell portfolio-circle-dividend">
                 <strong>${formatCurrency(totalDividendIncome)}</strong>
@@ -3453,7 +3595,7 @@ function renderAllHoldingsRows(holdings) {
           <td>
             <div class="all-holdings-value-stack">
               <strong>${formatOverallMoney(holding.marketValue, holding.currency)}</strong>
-              <span class="all-holdings-value-sub ${isCash ? "" : getToneClass(holding.profitLossDisplay ?? holding.profitLoss)}">${isCash ? "-" : formatOverallProfitWithRate(holding.profitLossDisplay ?? holding.profitLoss, holding.profitRateDisplay ?? holding.profitRate, holding.profitLossDisplayCurrency ?? holding.currency)}</span>
+              <span class="all-holdings-value-sub ${isCash ? "" : getToneClass(holding.totalReturnAmount)}">${isCash ? "-" : formatOverallProfitWithRate(holding.totalReturnAmount, holding.totalReturnRate, "KRW")}</span>
             </div>
           </td>
           <td>
@@ -3467,6 +3609,8 @@ function renderAllHoldingsRows(holdings) {
               `}
           </td>
           <td>${isCash ? "-" : formatOverallMoney(holding.annualDividendIncome, holding.currency)}</td>
+          <td>${isCash ? "-" : formatSignedCurrency(holding.realizedProfitLossKrw ?? 0)}</td>
+          <td>${isCash ? "-" : formatCurrency(holding.cumulativeDividendIncomeKrw ?? 0)}</td>
           <td>${formatPercent(holding.assetWeight)}</td>
         </tr>
       `;
@@ -3493,7 +3637,7 @@ function renderTableRows(portfolio) {
           <td>
             <div class="all-holdings-value-stack">
               <strong>${formatHoldingMoney(holding.marketValue, holding.currency)}</strong>
-              <span class="all-holdings-value-sub ${getToneClass(holding.profitLossDisplay ?? holding.profitLoss)}">${formatHoldingProfitWithRate(holding.profitLossDisplay ?? holding.profitLoss, holding.profitRateDisplay ?? holding.profitRate, holding.profitLossDisplayCurrency ?? holding.currency)}</span>
+              <span class="all-holdings-value-sub ${getToneClass(holding.totalReturnAmount)}">${formatHoldingProfitWithRate(holding.totalReturnAmount, holding.totalReturnRate, "KRW")}</span>
             </div>
           </td>
           <td>
@@ -3503,6 +3647,8 @@ function renderTableRows(portfolio) {
             </div>
           </td>
           <td>${formatHoldingMoney(holding.annualDividendIncome, holding.currency)}</td>
+          <td>${formatSignedCurrency(holding.realizedProfitLossKrw ?? 0)}</td>
+          <td>${formatCurrency(holding.cumulativeDividendIncomeKrw ?? 0)}</td>
           <td>${formatPercent(holding.assetWeight)}</td>
         </tr>
       `,
@@ -3529,8 +3675,25 @@ function renderAllHoldingsSection(book) {
     (total, holding) => total + holding.annualDividendIncomeBase,
     0,
   );
+  const aggregatedRealizedProfitLoss = aggregatedHoldings.reduce(
+    (total, holding) => total + Number(holding.realizedProfitLossKrw ?? 0),
+    0,
+  );
+  const aggregatedCumulativeDividendIncome = aggregatedHoldings.reduce(
+    (total, holding) => total + Number(holding.cumulativeDividendIncomeKrw ?? 0),
+    0,
+  );
   const aggregatedProfitRate =
     aggregatedCostBasis === 0 ? 0 : aggregatedProfitLoss / aggregatedCostBasis;
+  const aggregatedTotalReturnAmount = calculateTotalReturnAmount(
+    aggregatedProfitLoss,
+    aggregatedRealizedProfitLoss,
+    aggregatedCumulativeDividendIncome,
+  );
+  const aggregatedTotalReturnRate = calculateTotalReturnRate(
+    aggregatedTotalReturnAmount,
+    aggregatedCostBasis,
+  );
 
   return `
     <section
@@ -3542,7 +3705,7 @@ function renderAllHoldingsSection(book) {
         <div>
           <h2 class="section-title">Overall</h2>
           <p class="section-copy">
-            같은 종목을 여러 계좌에서 보유 중이면 한 줄로 합산했고, 현금(KRW, USD)도 함께 포함했습니다. 수량과 평가금액은 종목 기준으로 합치고, 손익은 평균단가 기준 매수금액으로 계산합니다. 배당(주당)과 연배당은 최근 1년 배당 기준으로 계산했습니다.
+            같은 종목을 여러 계좌에서 보유 중이면 한 줄로 합산했고, 현금(KRW, USD)도 함께 포함했습니다. 수량과 평가금액은 종목 기준으로 합치고, 평가금액 아래 수익은 Total Return(미실현손익 + 실현손익 + 누적배당) 기준으로 원화 합산 표시합니다.
           </p>
         </div>
         <div class="section-pill">중복 합산 후 ${currencyFormatter.format(uniqueHoldingsCount)}개 자산</div>
@@ -3559,6 +3722,8 @@ function renderAllHoldingsSection(book) {
               <th>평가금액</th>
               <th>배당/1주</th>
               <th>연배당</th>
+              <th>실현손익</th>
+              <th>누적배당</th>
               <th>비중</th>
             </tr>
           </thead>
@@ -3574,11 +3739,13 @@ function renderAllHoldingsSection(book) {
               <td>
                 <div class="all-holdings-value-stack">
                   <strong>${formatCurrency(aggregatedMarketValue)}</strong>
-                  <span class="all-holdings-value-sub ${getToneClass(aggregatedProfitLoss)}">${formatProfitWithRateCompact(aggregatedProfitLoss, aggregatedProfitRate)}</span>
+                  <span class="all-holdings-value-sub ${getToneClass(aggregatedTotalReturnAmount)}">${formatProfitWithRateCompact(aggregatedTotalReturnAmount, aggregatedTotalReturnRate)}</span>
                 </div>
               </td>
               <td>-</td>
               <td>${formatCurrency(aggregatedAnnualDividendIncome)}</td>
+              <td>${formatSignedCurrency(aggregatedRealizedProfitLoss)}</td>
+              <td>${formatCurrency(aggregatedCumulativeDividendIncome)}</td>
               <td>${formatPercent(book.overview.totalAssets === 0 ? 0 : aggregatedMarketValue / book.overview.totalAssets)}</td>
             </tr>
           </tfoot>
@@ -3601,7 +3768,7 @@ function renderAccountSummarySection(book) {
         <div>
           <h2 class="section-title">계좌 요약</h2>
           <p class="section-copy">
-            직투계좌, ISA, 연금저축, 퇴직연금을 5개 카테고리로 묶어 총자산과 연배당을 비교합니다. 연금저축(세액미공제)는 별도 분류하고, 나머지 연금저축 계좌는 세액공제로 묶었으며, 직투계좌만 배당소득세 15%를 반영했습니다.
+            직투계좌, ISA, 연금저축, 퇴직연금을 5개 카테고리로 묶어 총자산과 연배당을 비교합니다. 총자산 옆 괄호는 Total Return(미실현손익 + 실현손익 + 누적배당) 기준이며, 연금저축(세액미공제)는 별도 분류하고 나머지 연금저축 계좌는 세액공제로 묶었습니다. 직투계좌만 배당소득세 15%를 반영했습니다.
           </p>
         </div>
         <div class="section-pill">총자산 ${formatCurrency(book.overview.totalAssets)}</div>
@@ -3624,7 +3791,7 @@ function renderAccountSummarySection(book) {
                     <div class="account-summary-stats">
                       <div class="account-summary-amount-line">
                         <strong class="account-summary-amount">${formatCurrency(group.totalAssets)}</strong>
-                        <span class="account-summary-profit ${getToneClass(group.profitLoss)}">(${formatSignedCurrency(group.profitLoss)}, ${formatSignedPercentCompact(group.profitRate)})</span>
+                        <span class="account-summary-profit ${getToneClass(group.totalReturnAmount)}">(${formatSignedCurrency(group.totalReturnAmount)}, TR ${formatSignedPercentCompact(group.totalReturnRate)})</span>
                       </div>
                       <span class="account-summary-share">${formatPercent(group.weight)}</span>
                     </div>
@@ -3651,6 +3818,14 @@ function renderAccountSummarySection(book) {
                       <strong>세후 월배당</strong>
                       <span>${formatCurrency(group.monthlyNetDividendIncome)}</span>
                     </span>
+                    <span class="account-summary-dividend-item">
+                      <strong>실현손익</strong>
+                      <span class="${getToneClass(group.realizedProfitLoss)}">${formatSignedCurrency(group.realizedProfitLoss)}</span>
+                    </span>
+                    <span class="account-summary-dividend-item">
+                      <strong>누적배당</strong>
+                      <span>${formatCurrency(group.cumulativeDividendIncome)}</span>
+                    </span>
                   </div>
                 </div>
               `,
@@ -3667,8 +3842,8 @@ function renderPortfolioSection(portfolio) {
     ? `${portfolio.snapshotLabel} 원장 데이터를 유지하고, 현재가와 환율만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어 계산합니다. 해외 종목 평균단가는 원래 종목 통화 기준으로 표시하고, 원화 기준 입력값이 있으면 아래에 참고용으로 함께 보여줍니다. 평가손익은 평균단가 기준으로 계산합니다. 계좌 합계와 비중은 KRW 환산으로 계산합니다.`
     : `${portfolio.snapshotLabel} 원장 데이터를 유지하고, 현재가만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어 평가금액과 손익을 재계산합니다.`;
   const tableCopy = portfolio.hasForeignCurrency
-    ? "수량과 평균단가는 고정 원장 데이터입니다. 해외 종목 평균단가는 종목 통화 기준을 기본으로 보여주고, 원화 기준 입력값이 있으면 참고용으로 함께 표시합니다. 현재가와 평가금액, 배당 관련 값은 종목 통화 기준으로 표기하며, 평가손익은 평균단가 기준으로 계산합니다. 계좌 합계와 비중은 KRW 환산 기준으로 계산합니다."
-    : "수량과 평균단가는 고정 원장 데이터입니다. 현재가, 평가금액, 배당/1주, 연배당은 최신 시세와 최근 1년 배당 기준으로 다시 계산됩니다.";
+    ? "수량과 평균단가는 고정 원장 데이터입니다. 해외 종목 평균단가는 종목 통화 기준을 기본으로 보여주고, 원화 기준 입력값이 있으면 참고용으로 함께 표시합니다. 현재가와 평가금액, 배당 관련 값은 종목 통화 기준으로 표기하며, 평가금액 아래 수익은 Total Return(미실현손익 + 실현손익 + 누적배당) 기준으로 원화 환산 계산합니다. 계좌 합계와 비중은 KRW 환산 기준으로 계산합니다."
+    : "수량과 평균단가는 고정 원장 데이터입니다. 현재가, 평가금액, 배당/1주, 연배당은 최신 시세와 최근 1년 배당 기준으로 다시 계산됩니다. 평가금액 아래 수익은 Total Return(미실현손익 + 실현손익 + 누적배당) 기준으로 원화 표시합니다.";
 
   return `
     <section
@@ -3710,6 +3885,8 @@ function renderPortfolioSection(portfolio) {
                 <th>평가금액</th>
                 <th>배당/1주</th>
                 <th>연배당</th>
+                <th>실현손익</th>
+                <th>누적배당</th>
                 <th>비중</th>
               </tr>
             </thead>
@@ -3725,11 +3902,13 @@ function renderPortfolioSection(portfolio) {
                 <td>
                   <div class="all-holdings-value-stack">
                     <strong>${formatCurrency(portfolio.totals.marketValue)}</strong>
-                    <span class="all-holdings-value-sub ${getToneClass(portfolio.totals.profitLoss)}">${formatProfitWithRateCompact(portfolio.totals.profitLoss, portfolio.totals.totalReturn)}</span>
+                    <span class="all-holdings-value-sub ${getToneClass(portfolio.totals.totalReturnAmount)}">${formatProfitWithRateCompact(portfolio.totals.totalReturnAmount, portfolio.totals.totalReturnRate)}</span>
                   </div>
                 </td>
                 <td>-</td>
                 <td>${formatCurrency(portfolio.totals.annualDividendIncome)}</td>
+                <td>${formatSignedCurrency(portfolio.totals.realizedProfitLoss)}</td>
+                <td>${formatCurrency(portfolio.totals.cumulativeDividendIncome)}</td>
                 <td>${formatPercent(portfolio.totals.investedWeight)}</td>
               </tr>
             </tfoot>
@@ -3964,6 +4143,10 @@ function renderApp(book) {
                   금액표시 ${state.hideAmounts ? "Off" : "On"}
                 </button>
               </div>
+            </div>
+
+            <div class="summary-grid">
+              ${renderBookSummaryCards(book)}
             </div>
           </section>
 
