@@ -334,9 +334,9 @@
     {
       "id": "direct-investment",
       "name": "직투계좌",
-      "snapshotLabel": "2026년 3월 17일 사용자 제공 수치 기준, 2026년 3월 13일~17일 및 3월 31일 추가 매수와 원화/달러 기준 매수금액 반영",
-      "cash": 437941,
-      "cashUsd": 1395.73,
+      "snapshotLabel": "2026년 3월 17일 사용자 제공 수치 기준, 2026년 3월 13일~17일 및 3월 31일 추가 매수와 원화/달러 기준 매수금액 반영, 2026년 3월 31일 SCHD/Cash 직접 수정 반영",
+      "cash": 2942897,
+      "cashUsd": 350.96,
       "snapshotUsdKrw": 1472.18,
       "holdings": [
         {
@@ -344,9 +344,9 @@
           "name": "SCHD",
           "type": "ETF",
           "currency": "USD",
-          "quantity": 1247.869175,
-          "costBasis": 33752.31,
-          "averageCostKrw": 38811,
+          "quantity": 1264.174772,
+          "costBasis": 34252.33,
+          "averageCostKrw": 38893,
           "averageCostAdjustment": {
             "mode": "weighted-sale-history",
             "soldQuantity": 407.426754,
