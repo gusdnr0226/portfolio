@@ -6,7 +6,7 @@
     {
       "id": "pension-savings-1",
       "name": "연금저축(세액공제)",
-      "snapshotLabel": "2026년 3월 9일 20:38 스크린샷 기준",
+      "snapshotLabel": "2026년 3월 9일 20:38 스크린샷 기준, 2026년 3월 31일 사용자 제공 평균단가 반영",
       "cash": 16157,
       "holdings": [
         {
@@ -24,6 +24,14 @@
           "quantity": 580,
           "costBasis": 6163390,
           "snapshotPrice": 12390
+        },
+        {
+          "ticker": "379810",
+          "name": "KODEX 미국나스닥100",
+          "type": "ETF",
+          "quantity": 172,
+          "costBasis": 4054556,
+          "snapshotPrice": 24080
         }
       ]
     },
@@ -186,7 +194,7 @@
     {
       "id": "isa",
       "name": "ISA",
-      "snapshotLabel": "2026년 3월 13일 일부 평균단가 사용자 제공 반영, 시세는 2026년 3월 9일 22:36 스크린샷 2장 기준",
+      "snapshotLabel": "2026년 3월 13일 일부 평균단가 사용자 제공 반영, 시세는 2026년 3월 9일 22:36 스크린샷 2장 기준, 2026년 3월 31일 추가 매수 반영",
       "cash": 0,
       "holdings": [
         {
@@ -292,8 +300,8 @@
           "ticker": "418660",
           "name": "TIGER 미국나스닥100레버리지(합성)",
           "type": "ETF",
-          "quantity": 79,
-          "costBasis": 2683710,
+          "quantity": 116,
+          "costBasis": 3798150,
           "snapshotPrice": 33085
         },
         {
@@ -326,7 +334,7 @@
     {
       "id": "direct-investment",
       "name": "직투계좌",
-      "snapshotLabel": "2026년 3월 17일 사용자 제공 수치 기준, 2026년 3월 13일~17일 추가 매수와 원화/달러 기준 매수금액 반영",
+      "snapshotLabel": "2026년 3월 17일 사용자 제공 수치 기준, 2026년 3월 13일~17일 및 3월 31일 추가 매수와 원화/달러 기준 매수금액 반영",
       "cash": 437941,
       "cashUsd": 1395.73,
       "snapshotUsdKrw": 1472.18,
@@ -436,9 +444,9 @@
           "name": "AGNC 인베스트먼트",
           "type": "리츠",
           "currency": "USD",
-          "quantity": 800,
-          "costBasis": 8425.8,
-          "averageCostKrw": 15282,
+          "quantity": 850,
+          "costBasis": 8918.3,
+          "averageCostKrw": 15252,
           "snapshotPrice": 10.46
         },
         {
@@ -472,9 +480,9 @@
           "name": "QLD",
           "type": "ETF",
           "currency": "USD",
-          "quantity": 4,
-          "costBasis": 265.95,
-          "averageCostKrw": 98668,
+          "quantity": 14,
+          "costBasis": 889.42,
+          "averageCostKrw": 94983,
           "averageCostAdjustment": {
             "mode": "current-average"
           },
@@ -485,17 +493,17 @@
           "name": "SSO",
           "type": "ETF",
           "currency": "USD",
-          "quantity": 4,
-          "costBasis": 220.98,
-          "averageCostKrw": 82016,
+          "quantity": 14,
+          "costBasis": 743.68,
+          "averageCostKrw": 79432,
           "snapshotPrice": 54.74
         },
         {
           "ticker": "498400",
           "name": "KODEX 200타겟위클리커버드콜",
           "type": "ETF",
-          "quantity": 500,
-          "costBasis": 7271000,
+          "quantity": 600,
+          "costBasis": 8875500,
           "snapshotPrice": 17500
         },
         {
