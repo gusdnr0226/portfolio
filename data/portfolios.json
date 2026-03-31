@@ -347,12 +347,6 @@
           "quantity": 1264.174772,
           "costBasis": 34252.33,
           "averageCostKrw": 38893,
-          "averageCostAdjustment": {
-            "mode": "weighted-sale-history",
-            "soldQuantity": 407.426754,
-            "soldPurchaseAmount": 11404.32,
-            "soldPurchaseAmountKrw": 16148135
-          },
           "snapshotPrice": 30.94
         },
         {
@@ -363,12 +357,6 @@
           "quantity": 49.162301,
           "costBasis": 25821.57,
           "averageCostKrw": 752242,
-          "averageCostAdjustment": {
-            "mode": "weighted-sale-history",
-            "soldQuantity": 5,
-            "soldPurchaseAmount": 2529.86,
-            "soldPurchaseAmountKrw": 3526058
-          },
           "snapshotPrice": 598.27
         },
         {
@@ -379,12 +367,6 @@
           "quantity": 459.260168,
           "costBasis": 25814.46,
           "averageCostKrw": 81696,
-          "averageCostAdjustment": {
-            "mode": "weighted-sale-history",
-            "soldQuantity": 373,
-            "soldPurchaseAmount": 20427.25,
-            "soldPurchaseAmountKrw": 29152085
-          },
           "snapshotPrice": 56.99
         },
         {
@@ -395,12 +377,6 @@
           "quantity": 428.242203,
           "costBasis": 24220.84,
           "averageCostKrw": 81285,
-          "averageCostAdjustment": {
-            "mode": "weighted-sale-history",
-            "soldQuantity": 96,
-            "soldPurchaseAmount": 5690.92,
-            "soldPurchaseAmountKrw": 7846880
-          },
           "snapshotPrice": 57.38
         },
         {
@@ -411,12 +387,6 @@
           "quantity": 36.711293,
           "costBasis": 20401.62,
           "averageCostKrw": 796638,
-          "averageCostAdjustment": {
-            "mode": "weighted-sale-history",
-            "soldQuantity": 15,
-            "soldPurchaseAmount": 8134.39,
-            "soldPurchaseAmountKrw": 11529532
-          },
           "snapshotPrice": 614.4
         },
         {
@@ -467,12 +437,6 @@
           "quantity": 50,
           "costBasis": 1982.62,
           "averageCostKrw": 58541,
-          "averageCostAdjustment": {
-            "mode": "weighted-sale-history",
-            "soldQuantity": 50,
-            "soldPurchaseAmount": 2895.21,
-            "soldPurchaseAmountKrw": 4030475
-          },
           "snapshotPrice": 32.18
         },
         {
@@ -483,9 +447,6 @@
           "quantity": 14,
           "costBasis": 889.42,
           "averageCostKrw": 94983,
-          "averageCostAdjustment": {
-            "mode": "current-average"
-          },
           "snapshotPrice": 65.74
         },
         {

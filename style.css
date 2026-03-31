@@ -2139,26 +2139,21 @@ tfoot td {
 
   .all-holdings-table tbody td:nth-child(5)::before,
   .all-holdings-table tfoot td:nth-child(5)::before {
-    content: "평단(보정)";
+    content: "평가금액";
   }
 
   .all-holdings-table tbody td:nth-child(6)::before,
   .all-holdings-table tfoot td:nth-child(6)::before {
-    content: "평가금액";
+    content: "배당/1주";
   }
 
   .all-holdings-table tbody td:nth-child(7)::before,
   .all-holdings-table tfoot td:nth-child(7)::before {
-    content: "배당/1주";
+    content: "연배당";
   }
 
   .all-holdings-table tbody td:nth-child(8)::before,
   .all-holdings-table tfoot td:nth-child(8)::before {
-    content: "연배당";
-  }
-
-  .all-holdings-table tbody td:nth-child(9)::before,
-  .all-holdings-table tfoot td:nth-child(9)::before {
     content: "비중";
   }
 

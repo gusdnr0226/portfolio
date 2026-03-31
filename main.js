@@ -437,93 +437,6 @@ function getHoldingAverageCostKrw(holding) {
   return Number.isFinite(holding?.averageCostKrw) ? holding.averageCostKrw : null;
 }
 
-function getHoldingAverageCostAdjustment(holding) {
-  if (!holding?.averageCostAdjustment || typeof holding.averageCostAdjustment !== "object") {
-    return null;
-  }
-
-  return holding.averageCostAdjustment;
-}
-
-function calculateAdjustedAverageCost(currentAverageCost, quantity, soldQuantity, soldPurchaseAmount) {
-  if (
-    !Number.isFinite(currentAverageCost) ||
-    !Number.isFinite(quantity) ||
-    quantity <= 0
-  ) {
-    return null;
-  }
-
-  if (
-    !Number.isFinite(soldQuantity) ||
-    soldQuantity <= 0 ||
-    !Number.isFinite(soldPurchaseAmount) ||
-    soldPurchaseAmount <= 0
-  ) {
-    return currentAverageCost;
-  }
-
-  const historicalAverageCost = soldPurchaseAmount / soldQuantity;
-
-  if (!Number.isFinite(historicalAverageCost)) {
-    return currentAverageCost;
-  }
-
-  if (quantity < soldQuantity) {
-    return (
-      (currentAverageCost * quantity) +
-      (historicalAverageCost * soldQuantity)
-    ) / (quantity + soldQuantity);
-  }
-
-  return (
-    (currentAverageCost * (quantity - soldQuantity)) +
-    (historicalAverageCost * soldQuantity)
-  ) / quantity;
-}
-
-function getHoldingAdjustedAverageCost(holding) {
-  const currentAverageCost = getHoldingAverageCost(holding);
-
-  if (!Number.isFinite(currentAverageCost)) {
-    return null;
-  }
-
-  const adjustment = getHoldingAverageCostAdjustment(holding);
-
-  if (adjustment?.mode === "current-average") {
-    return currentAverageCost;
-  }
-
-  return calculateAdjustedAverageCost(
-    currentAverageCost,
-    Number(holding?.quantity),
-    Number(adjustment?.soldQuantity ?? 0),
-    Number(adjustment?.soldPurchaseAmount ?? Number.NaN),
-  );
-}
-
-function getHoldingAdjustedAverageCostKrw(holding) {
-  const currentAverageCostKrw = getHoldingAverageCostKrw(holding);
-
-  if (!Number.isFinite(currentAverageCostKrw)) {
-    return null;
-  }
-
-  const adjustment = getHoldingAverageCostAdjustment(holding);
-
-  if (adjustment?.mode === "current-average") {
-    return currentAverageCostKrw;
-  }
-
-  return calculateAdjustedAverageCost(
-    currentAverageCostKrw,
-    Number(holding?.quantity),
-    Number(adjustment?.soldQuantity ?? 0),
-    Number(adjustment?.soldPurchaseAmountKrw ?? Number.NaN),
-  );
-}
-
 function getCashKrw(account) {
   return Number(account?.cash ?? 0);
 }
@@ -747,31 +660,6 @@ function renderAverageCostCell(averageCost, averageCostCurrency, averageCostKrw,
     <div class="all-holdings-value-stack">
       <strong>${primaryLabel}</strong>
       <span class="all-holdings-value-sub">${formatCost(averageCostKrw, "KRW")}</span>
-    </div>
-  `;
-}
-
-function renderAdjustedAverageCostCell(
-  adjustedAverageCost,
-  currency = "KRW",
-  adjustedAverageCostKrw = null,
-  { overall = false } = {},
-) {
-  if (!Number.isFinite(adjustedAverageCost)) {
-    return "-";
-  }
-
-  const formatCost = overall ? formatOverallAverageCost : formatAverageCost;
-  const primaryLabel = formatCost(adjustedAverageCost, currency);
-
-  if (!Number.isFinite(adjustedAverageCostKrw) || currency === "KRW") {
-    return primaryLabel;
-  }
-
-  return `
-    <div class="all-holdings-value-stack">
-      <strong>${primaryLabel}</strong>
-      <span class="all-holdings-value-sub">${formatCost(adjustedAverageCostKrw, "KRW")}</span>
     </div>
   `;
 }
@@ -1356,22 +1244,17 @@ function buildPortfolioData(source, livePriceSource, dividendSource) {
     const averageCost = getHoldingAverageCost(holding);
     const averageCostCurrency = currency;
     const averageCostKrw = getHoldingAverageCostKrw(holding);
-    const adjustedAverageCost = getHoldingAdjustedAverageCost(holding);
-    const adjustedAverageCostKrw = getHoldingAdjustedAverageCostKrw(holding);
     const storedQuote = !holding.manualPriceOnly ? quotes[holding.ticker] : null;
     const shouldUseStoredQuote =
       hasUsableQuote(storedQuote) &&
       (hasAutomaticQuotes || !isFallbackSource || storedQuote.price !== holding.snapshotPrice);
     const currentPrice = shouldUseStoredQuote ? storedQuote.price : holding.snapshotPrice;
-    const adjustedCostBasis = Number.isFinite(adjustedAverageCost)
-      ? adjustedAverageCost * holding.quantity
-      : holding.costBasis;
     const marketValue = currentPrice * holding.quantity;
-    const adjustedProfitLoss = marketValue - adjustedCostBasis;
+    const profitLoss = marketValue - holding.costBasis;
     const marketValueBase = convertToBaseCurrency(marketValue, currency, usdKrwRate);
-    const costBasisBase = Number.isFinite(adjustedAverageCostKrw)
-      ? adjustedAverageCostKrw * holding.quantity
-      : convertToBaseCurrency(adjustedCostBasis, currency, usdKrwRate);
+    const costBasisBase = Number.isFinite(averageCostKrw)
+      ? averageCostKrw * holding.quantity
+      : convertToBaseCurrency(holding.costBasis, currency, usdKrwRate);
     const profitLossBase = marketValueBase - costBasisBase;
     const annualDividendPerShare = getAnnualDividendPerShare(dividendSource, holding, currentPrice);
     const annualDividendIncome = annualDividendPerShare * holding.quantity;
@@ -1380,10 +1263,9 @@ function buildPortfolioData(source, livePriceSource, dividendSource) {
       currency,
       usdKrwRate,
     );
-    const profitRate = adjustedCostBasis === 0 ? 0 : adjustedProfitLoss / adjustedCostBasis;
+    const profitRate = holding.costBasis === 0 ? 0 : profitLoss / holding.costBasis;
     const profitRateBase = costBasisBase === 0 ? 0 : profitLossBase / costBasisBase;
-    const useKrwProfitDisplay =
-      Number.isFinite(adjustedAverageCostKrw) || Number.isFinite(averageCostKrw);
+    const useKrwProfitDisplay = Number.isFinite(averageCostKrw);
 
     return {
       ...holding,
@@ -1393,20 +1275,18 @@ function buildPortfolioData(source, livePriceSource, dividendSource) {
       marketValue,
       marketValueBase,
       costBasisBase,
-      profitLoss: adjustedProfitLoss,
+      profitLoss,
       profitLossBase,
       annualDividendPerShare,
       annualDividendIncome,
       annualDividendIncomeBase,
       profitRate,
       profitRateDisplay: useKrwProfitDisplay ? profitRateBase : profitRate,
-      profitLossDisplay: useKrwProfitDisplay ? profitLossBase : adjustedProfitLoss,
+      profitLossDisplay: useKrwProfitDisplay ? profitLossBase : profitLoss,
       profitLossDisplayCurrency: useKrwProfitDisplay ? "KRW" : currency,
       averageCost,
       averageCostCurrency,
       averageCostKrw,
-      adjustedAverageCost,
-      adjustedAverageCostKrw,
       priceSource: holding.manualPriceOnly
         ? "manual"
         : shouldUseStoredQuote
@@ -2883,10 +2763,6 @@ function buildAggregatedHoldings(book) {
       annualDividendIncomeBase: 0,
       averageCostKrwTotal: 0,
       averageCostKrwQuantity: 0,
-      adjustedAverageCostTotal: 0,
-      adjustedAverageCostQuantity: 0,
-      adjustedAverageCostKrwTotal: 0,
-      adjustedAverageCostKrwQuantity: 0,
       accountNames: new Set(),
       priceSources: [],
       nameInferred: false,
@@ -2920,10 +2796,6 @@ function buildAggregatedHoldings(book) {
         annualDividendIncomeBase: 0,
         averageCostKrwTotal: 0,
         averageCostKrwQuantity: 0,
-        adjustedAverageCostTotal: 0,
-        adjustedAverageCostQuantity: 0,
-        adjustedAverageCostKrwTotal: 0,
-        adjustedAverageCostKrwQuantity: 0,
         accountNames: new Set(),
         priceSources: [],
         nameInferred: false,
@@ -2942,14 +2814,6 @@ function buildAggregatedHoldings(book) {
       if (Number.isFinite(holding.averageCostKrw)) {
         existingHolding.averageCostKrwTotal += holding.averageCostKrw * holding.quantity;
         existingHolding.averageCostKrwQuantity += holding.quantity;
-      }
-      if (Number.isFinite(holding.adjustedAverageCost)) {
-        existingHolding.adjustedAverageCostTotal += holding.adjustedAverageCost * holding.quantity;
-        existingHolding.adjustedAverageCostQuantity += holding.quantity;
-      }
-      if (Number.isFinite(holding.adjustedAverageCostKrw)) {
-        existingHolding.adjustedAverageCostKrwTotal += holding.adjustedAverageCostKrw * holding.quantity;
-        existingHolding.adjustedAverageCostKrwQuantity += holding.quantity;
       }
       existingHolding.accountNames.add(portfolio.name);
       existingHolding.priceSources.push(holding.priceSource);
@@ -2987,35 +2851,15 @@ function buildAggregatedHoldings(book) {
       const averageCostKrw = hasCompleteAverageCostKrw
         ? holding.averageCostKrwTotal / holding.quantity
         : null;
-      const hasCompleteAdjustedAverageCost =
-        holding.quantity > 0 &&
-        Math.abs(holding.adjustedAverageCostQuantity - holding.quantity) < 0.000001;
-      const adjustedAverageCost = hasCompleteAdjustedAverageCost
-        ? holding.adjustedAverageCostTotal / holding.quantity
-        : null;
-      const hasCompleteAdjustedAverageCostKrw =
-        holding.quantity > 0 &&
-        Math.abs(holding.adjustedAverageCostKrwQuantity - holding.quantity) < 0.000001;
-      const adjustedAverageCostKrw = hasCompleteAdjustedAverageCostKrw
-        ? holding.adjustedAverageCostKrwTotal / holding.quantity
-        : null;
       const profitRateBase =
         holding.type === "현금" || holding.costBasisBase === 0
           ? 0
           : holding.profitLossBase / holding.costBasisBase;
-      const adjustedCostBasis =
-        holding.type === "현금" || holding.quantity === 0
-          ? 0
-          : (adjustedAverageCost ?? holding.costBasis / holding.quantity) * holding.quantity;
-      const adjustedProfitLoss =
-        holding.type === "현금" || holding.quantity === 0
-          ? 0
-          : holding.marketValue - adjustedCostBasis;
       const profitRate =
-        holding.type === "현금" || adjustedCostBasis === 0
+        holding.type === "현금" || holding.costBasis === 0
           ? 0
-          : adjustedProfitLoss / adjustedCostBasis;
-      const useKrwProfitDisplay = adjustedAverageCostKrw !== null || averageCostKrw !== null;
+          : holding.profitLoss / holding.costBasis;
+      const useKrwProfitDisplay = averageCostKrw !== null;
 
       return {
         ...holding,
@@ -3027,11 +2871,9 @@ function buildAggregatedHoldings(book) {
           holding.type === "현금" || holding.quantity === 0 ? null : holding.costBasis / holding.quantity,
         averageCostCurrency: holding.currency,
         averageCostKrw,
-        adjustedAverageCost,
-        adjustedAverageCostKrw,
         profitRate,
         profitRateDisplay: useKrwProfitDisplay ? profitRateBase : profitRate,
-        profitLossDisplay: useKrwProfitDisplay ? holding.profitLossBase : adjustedProfitLoss,
+        profitLossDisplay: useKrwProfitDisplay ? holding.profitLossBase : holding.profitLoss,
         profitLossDisplayCurrency: useKrwProfitDisplay ? "KRW" : holding.currency,
         assetWeight:
           book.overview.totalAssets === 0 ? 0 : holding.marketValueBase / book.overview.totalAssets,
@@ -3608,7 +3450,6 @@ function renderAllHoldingsRows(holdings) {
               `}
           </td>
           <td>${isCash ? "-" : renderAverageCostCell(holding.averageCost, holding.averageCostCurrency ?? holding.currency, holding.averageCostKrw, { overall: true })}</td>
-          <td>${isCash ? "-" : renderAdjustedAverageCostCell(holding.adjustedAverageCost, holding.currency, holding.adjustedAverageCostKrw, { overall: true })}</td>
           <td>
             <div class="all-holdings-value-stack">
               <strong>${formatOverallMoney(holding.marketValue, holding.currency)}</strong>
@@ -3649,7 +3490,6 @@ function renderTableRows(portfolio) {
             </div>
           </td>
           <td>${renderAverageCostCell(holding.averageCost, holding.averageCostCurrency ?? holding.currency, holding.averageCostKrw)}</td>
-          <td>${renderAdjustedAverageCostCell(holding.adjustedAverageCost, holding.currency, holding.adjustedAverageCostKrw)}</td>
           <td>
             <div class="all-holdings-value-stack">
               <strong>${formatHoldingMoney(holding.marketValue, holding.currency)}</strong>
@@ -3702,7 +3542,7 @@ function renderAllHoldingsSection(book) {
         <div>
           <h2 class="section-title">Overall</h2>
           <p class="section-copy">
-            같은 종목을 여러 계좌에서 보유 중이면 한 줄로 합산했고, 현금(KRW, USD)도 함께 포함했습니다. 수량과 평가금액은 종목 기준으로 합치고, 손익은 평단(보정) 기준 매수금액으로 다시 계산합니다. 배당(주당)과 연배당은 최근 1년 배당 기준으로 계산했습니다.
+            같은 종목을 여러 계좌에서 보유 중이면 한 줄로 합산했고, 현금(KRW, USD)도 함께 포함했습니다. 수량과 평가금액은 종목 기준으로 합치고, 손익은 평균단가 기준 매수금액으로 계산합니다. 배당(주당)과 연배당은 최근 1년 배당 기준으로 계산했습니다.
           </p>
         </div>
         <div class="section-pill">중복 합산 후 ${currencyFormatter.format(uniqueHoldingsCount)}개 자산</div>
@@ -3716,7 +3556,6 @@ function renderAllHoldingsSection(book) {
               <th>수량</th>
               <th>현재가</th>
               <th>평균단가</th>
-              <th>평단(보정)</th>
               <th>평가금액</th>
               <th>배당/1주</th>
               <th>연배당</th>
@@ -3729,7 +3568,6 @@ function renderAllHoldingsSection(book) {
           <tfoot>
             <tr>
               <td>합계 (현금 포함, 원화 환산)</td>
-              <td>-</td>
               <td>-</td>
               <td>-</td>
               <td>-</td>
@@ -3826,10 +3664,10 @@ function renderAccountSummarySection(book) {
 
 function renderPortfolioSection(portfolio) {
   const heroCopy = portfolio.hasForeignCurrency
-    ? `${portfolio.snapshotLabel} 원장 데이터를 유지하고, 현재가와 환율만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어 계산합니다. 해외 종목 평균단가와 평균단가(보정)는 원래 종목 통화 기준으로 표시하고, 원화 기준 입력값이 있으면 아래에 참고용으로 함께 보여줍니다. 평균단가(보정)는 현재 평단과 누적 판매수량, 누적 총 구매금액 기준의 가중평균 참고값이며, 현재수량이 누적판매수량보다 작으면 두 수량 합 기준 가중평균을 사용합니다. 평가손익은 평단(보정)이 있으면 그 기준으로 다시 계산합니다. 계좌 합계와 비중은 KRW 환산으로 계산합니다.`
+    ? `${portfolio.snapshotLabel} 원장 데이터를 유지하고, 현재가와 환율만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어 계산합니다. 해외 종목 평균단가는 원래 종목 통화 기준으로 표시하고, 원화 기준 입력값이 있으면 아래에 참고용으로 함께 보여줍니다. 평가손익은 평균단가 기준으로 계산합니다. 계좌 합계와 비중은 KRW 환산으로 계산합니다.`
     : `${portfolio.snapshotLabel} 원장 데이터를 유지하고, 현재가만 외부 시세 또는 저장된 최신 시세 파일에서 다시 읽어 평가금액과 손익을 재계산합니다.`;
   const tableCopy = portfolio.hasForeignCurrency
-    ? "수량과 평균단가는 고정 원장 데이터입니다. 해외 종목 평균단가와 평균단가(보정)는 종목 통화 기준을 기본으로 보여주고, 원화 기준 입력값이 있으면 참고용으로 함께 표시합니다. 평균단가(보정)는 기본적으로 `(현재평단 x (현재수량 - 누적판매수량) + 기존평단 x 누적판매수량) / 현재수량` 참고값이며, 기존평단은 누적 총 구매금액을 누적 판매수량으로 나눠 계산합니다. 현재수량이 누적판매수량보다 작으면 `(현재평단 x 현재수량 + 기존평단 x 누적판매수량) / (현재수량 + 누적판매수량)` 가중평균을 사용합니다. 현재가와 평가금액, 배당 관련 값은 종목 통화 기준으로 표기하며, 평가손익은 평단(보정)이 있으면 그 기준으로 다시 계산합니다. 계좌 합계와 비중은 KRW 환산 기준으로 계산합니다."
+    ? "수량과 평균단가는 고정 원장 데이터입니다. 해외 종목 평균단가는 종목 통화 기준을 기본으로 보여주고, 원화 기준 입력값이 있으면 참고용으로 함께 표시합니다. 현재가와 평가금액, 배당 관련 값은 종목 통화 기준으로 표기하며, 평가손익은 평균단가 기준으로 계산합니다. 계좌 합계와 비중은 KRW 환산 기준으로 계산합니다."
     : "수량과 평균단가는 고정 원장 데이터입니다. 현재가, 평가금액, 배당/1주, 연배당은 최신 시세와 최근 1년 배당 기준으로 다시 계산됩니다.";
 
   return `
@@ -3869,7 +3707,6 @@ function renderPortfolioSection(portfolio) {
                 <th>수량</th>
                 <th>현재가</th>
                 <th>평균단가</th>
-                <th>평단(보정)</th>
                 <th>평가금액</th>
                 <th>배당/1주</th>
                 <th>연배당</th>
@@ -3883,7 +3720,6 @@ function renderPortfolioSection(portfolio) {
               <tr>
                 <td>합계 (주식)</td>
                 <td>${formatQuantity(portfolio.totals.quantity)}</td>
-                <td>-</td>
                 <td>-</td>
                 <td>-</td>
                 <td>
