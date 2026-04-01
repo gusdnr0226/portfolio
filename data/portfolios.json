@@ -402,9 +402,9 @@
     {
       "id": "direct-investment",
       "name": "직투계좌",
-      "snapshotLabel": "2026년 3월 17일 사용자 제공 수치 기준, 2026년 3월 13일~17일 및 3월 31일 추가 매수와 원화/달러 기준 매수금액 반영, 2026년 3월 31일 SCHD/Cash 직접 수정 반영",
-      "cash": 2942897,
-      "cashUsd": 350.96,
+      "snapshotLabel": "2026년 3월 17일 사용자 제공 수치 기준, 2026년 3월 13일~17일 및 3월 31일 추가 매수와 원화/달러 기준 매수금액 반영, 2026년 3월 31일 SCHD/Cash 직접 수정 반영, 2026년 4월 1일 KODEX 머니마켓액티브 30주 추가 매수 반영",
+      "cash": 69570,
+      "cashUsd": 850,
       "snapshotUsdKrw": 1472.18,
       "holdings": [
         {
@@ -565,8 +565,8 @@
           "ticker": "488770",
           "name": "KODEX 머니마켓액티브",
           "type": "ETF",
-          "quantity": 60,
-          "costBasis": 6211410,
+          "quantity": 90,
+          "costBasis": 9330210,
           "snapshotPrice": 103765,
           "realizedProfitLossKrw": 0,
           "cumulativeDividendIncomeKrw": 0

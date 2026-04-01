@@ -2751,64 +2751,6 @@ function renderSummaryCards(portfolio) {
     .join("");
 }
 
-function renderBookSummaryCards(book) {
-  const cashBreakdown = formatCashBreakdown(book.overview.cashKrw, book.overview.cashUsd);
-  const cards = [
-    {
-      label: "전체 총자산",
-      value: formatCurrency(book.overview.totalAssets),
-      detail: `주식 ${formatCurrency(book.overview.marketValue)} + 현금 ${formatCurrency(book.overview.cash)}`,
-      tone: "",
-    },
-    {
-      label: "전체 Total Return",
-      value: formatSignedCurrency(book.overview.totalReturnAmount),
-      detail: `전체 계좌 기준 ${formatSignedPercent(book.overview.totalReturnRate)}`,
-      tone: getToneClass(book.overview.totalReturnAmount),
-    },
-    {
-      label: "전체 현금",
-      value: formatCurrency(book.overview.cash),
-      detail: book.overview.cashUsd > 0 && cashBreakdown
-        ? `${cashBreakdown} · ${book.portfolios.length}개 계좌 운영`
-        : `${book.portfolios.length}개 계좌 운영`,
-      tone: "",
-    },
-    {
-      label: "전체 실현손익",
-      value: formatSignedCurrency(book.overview.realizedProfitLoss),
-      detail: "계좌 원장 누적 기준",
-      tone: getToneClass(book.overview.realizedProfitLoss),
-    },
-    {
-      label: "누적 배당수익",
-      value: formatCurrency(book.overview.cumulativeDividendIncome),
-      detail: "계좌 원장 누적 기준",
-      tone: "",
-    },
-    {
-      label: "총 보유 종목",
-      value: `${currencyFormatter.format(book.overview.holdingsCount)}개`,
-      detail: book.hasForeignCurrency
-        ? "현재가와 환율만 자동 갱신, 수량/평단은 원장 기준"
-        : "현재가만 외부 시세로 갱신, 수량/평단은 원장 기준",
-      tone: "",
-    },
-  ];
-
-  return cards
-    .map(
-      (card) => `
-        <article class="summary-card">
-          <p class="summary-label">${card.label}</p>
-          <p class="summary-value ${card.tone}">${card.value}</p>
-          <p class="summary-detail">${card.detail}</p>
-        </article>
-      `,
-    )
-    .join("");
-}
-
 function getTopHoldings(portfolio, limit = 3) {
   return [...portfolio.holdings]
     .sort((left, right) => right.marketValueBase - left.marketValueBase)
@@ -3609,6 +3551,15 @@ function renderAllHoldingsRows(holdings) {
               `}
           </td>
           <td>${isCash ? "-" : formatOverallMoney(holding.annualDividendIncome, holding.currency)}</td>
+          <td>
+            ${isCash
+              ? "-"
+              : formatOverallProfitWithRate(
+                holding.profitLossDisplay,
+                holding.profitRateDisplay,
+                holding.profitLossDisplayCurrency,
+              )}
+          </td>
           <td>${isCash ? "-" : formatSignedCurrency(holding.realizedProfitLossKrw ?? 0)}</td>
           <td>${isCash ? "-" : formatCurrency(holding.cumulativeDividendIncomeKrw ?? 0)}</td>
           <td>${formatPercent(holding.assetWeight)}</td>
@@ -3647,6 +3598,11 @@ function renderTableRows(portfolio) {
             </div>
           </td>
           <td>${formatHoldingMoney(holding.annualDividendIncome, holding.currency)}</td>
+          <td>${formatHoldingProfitWithRate(
+            holding.profitLossDisplay,
+            holding.profitRateDisplay,
+            holding.profitLossDisplayCurrency,
+          )}</td>
           <td>${formatSignedCurrency(holding.realizedProfitLossKrw ?? 0)}</td>
           <td>${formatCurrency(holding.cumulativeDividendIncomeKrw ?? 0)}</td>
           <td>${formatPercent(holding.assetWeight)}</td>
@@ -3722,6 +3678,7 @@ function renderAllHoldingsSection(book) {
               <th>평가금액</th>
               <th>배당/1주</th>
               <th>연배당</th>
+              <th>미실현손익</th>
               <th>실현손익</th>
               <th>누적배당</th>
               <th>비중</th>
@@ -3744,6 +3701,7 @@ function renderAllHoldingsSection(book) {
               </td>
               <td>-</td>
               <td>${formatCurrency(aggregatedAnnualDividendIncome)}</td>
+              <td>${formatProfitWithRateCompact(aggregatedProfitLoss, aggregatedProfitRate)}</td>
               <td>${formatSignedCurrency(aggregatedRealizedProfitLoss)}</td>
               <td>${formatCurrency(aggregatedCumulativeDividendIncome)}</td>
               <td>${formatPercent(book.overview.totalAssets === 0 ? 0 : aggregatedMarketValue / book.overview.totalAssets)}</td>
@@ -3885,6 +3843,7 @@ function renderPortfolioSection(portfolio) {
                 <th>평가금액</th>
                 <th>배당/1주</th>
                 <th>연배당</th>
+                <th>미실현손익</th>
                 <th>실현손익</th>
                 <th>누적배당</th>
                 <th>비중</th>
@@ -3907,6 +3866,7 @@ function renderPortfolioSection(portfolio) {
                 </td>
                 <td>-</td>
                 <td>${formatCurrency(portfolio.totals.annualDividendIncome)}</td>
+                <td>${formatProfitWithRateCompact(portfolio.totals.profitLoss, portfolio.totals.totalReturn)}</td>
                 <td>${formatSignedCurrency(portfolio.totals.realizedProfitLoss)}</td>
                 <td>${formatCurrency(portfolio.totals.cumulativeDividendIncome)}</td>
                 <td>${formatPercent(portfolio.totals.investedWeight)}</td>
@@ -4145,9 +4105,6 @@ function renderApp(book) {
               </div>
             </div>
 
-            <div class="summary-grid">
-              ${renderBookSummaryCards(book)}
-            </div>
           </section>
 
           ${renderPortfolioCircleChart(treemap)}

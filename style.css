@@ -63,24 +63,25 @@ body::before {
 
 .page {
   position: relative;
-  padding: 48px 20px 72px;
+  padding: 40px 16px 64px;
 }
 
 #app {
-  width: min(1360px, 100%);
+  width: min(1800px, 100%);
   margin: 0 auto;
 }
 
 .dashboard-shell {
   display: grid;
-  grid-template-columns: minmax(220px, 244px) minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: 1fr;
+  gap: 16px;
   align-items: start;
 }
 
 .dashboard-sidebar {
   position: sticky;
-  top: 24px;
+  top: 12px;
+  z-index: 10;
   align-self: start;
 }
 
@@ -89,16 +90,16 @@ body::before {
 }
 
 .sidebar-anchor-section {
-  scroll-margin-top: 24px;
+  scroll-margin-top: 112px;
 }
 
 .sidebar-nav-card {
   position: relative;
   display: grid;
-  gap: 18px;
-  padding: 22px 18px;
+  gap: 12px;
+  padding: 14px 16px;
   border: 1px solid var(--line);
-  border-radius: 24px;
+  border-radius: 22px;
   background:
     radial-gradient(circle at top right, rgba(111, 169, 216, 0.18), transparent 34%),
     radial-gradient(circle at left bottom, rgba(92, 168, 147, 0.12), transparent 28%),
@@ -110,20 +111,16 @@ body::before {
 .sidebar-nav-card::after {
   content: "";
   position: absolute;
-  inset: auto -32px -42px auto;
-  width: 110px;
-  height: 110px;
+  inset: auto -24px -34px auto;
+  width: 92px;
+  height: 92px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(111, 169, 216, 0.16), transparent 70%);
   pointer-events: none;
 }
 
 .sidebar-nav-brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 4px 4px 14px;
-  border-bottom: 1px solid rgba(126, 144, 171, 0.12);
+  display: none;
 }
 
 .sidebar-nav-brand-mark {
@@ -159,22 +156,27 @@ body::before {
 }
 
 .sidebar-nav-groups {
-  display: grid;
-  gap: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: flex-start;
 }
 
 .sidebar-nav-group {
-  display: grid;
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
 }
 
 .sidebar-nav-group-label {
   margin: 0;
-  padding: 0 4px;
+  padding: 0 2px;
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -182,9 +184,9 @@ body::before {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 48px;
-  padding: 12px 14px;
+  gap: 10px;
+  min-height: 42px;
+  padding: 9px 12px;
   border: 1px solid transparent;
   border-radius: 16px;
   color: var(--text);
@@ -197,7 +199,7 @@ body::before {
 }
 
 .sidebar-nav-link:hover {
-  transform: translateX(2px);
+  transform: translateY(-1px);
   border-color: rgba(111, 169, 216, 0.18);
   background: rgba(255, 255, 255, 0.58);
 }
@@ -213,23 +215,24 @@ body::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  height: 28px;
+  min-width: 26px;
+  height: 26px;
   padding: 0 8px;
   border-radius: 999px;
   background: rgba(111, 169, 216, 0.14);
   color: var(--accent-strong);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.06em;
 }
 
 .sidebar-nav-link.is-subitem {
   min-height: auto;
-  padding: 10px 14px;
+  padding: 9px 12px;
   border-radius: 14px;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.84rem;
+  white-space: nowrap;
 }
 
 .sidebar-nav-link.is-subitem.is-active {
@@ -237,11 +240,12 @@ body::before {
 }
 
 .sidebar-nav-subgroup {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-left: 12px;
-  padding-left: 12px;
-  border-left: 1px solid rgba(126, 144, 171, 0.12);
+  margin-left: 0;
+  padding-left: 0;
+  border-left: 0;
 }
 
 .dashboard {
@@ -1686,7 +1690,7 @@ body::before {
 
 .table-wrap {
   overflow-x: auto;
-  padding: 0 18px 18px;
+  padding: 0 10px 12px;
 }
 
 table {
@@ -1696,21 +1700,22 @@ table {
 }
 
 .all-holdings-table {
-  min-width: 1040px;
+  min-width: 900px;
+  font-size: 0.79rem;
 }
 
 thead th {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 14px 16px;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--line);
   background: rgba(235, 242, 246, 0.98);
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-align: right;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.015em;
 }
 
 thead th:first-child,
@@ -1720,33 +1725,33 @@ tfoot td:first-child {
 }
 
 .all-holdings-table thead th:nth-child(1) {
-  min-width: 220px;
-  width: 220px;
+  min-width: 160px;
+  width: 160px;
 }
 
 .all-holdings-table td:first-child .asset-name {
-  font-size: 0.92rem;
-  line-height: 1.26;
-  letter-spacing: -0.045em;
+  font-size: 0.78rem;
+  line-height: 1.16;
+  letter-spacing: -0.03em;
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
 
 .all-holdings-value-stack {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   justify-items: end;
 }
 
 .all-holdings-value-stack strong {
-  font-size: 0.98rem;
-  line-height: 1.35;
+  font-size: 0.84rem;
+  line-height: 1.18;
   white-space: nowrap;
 }
 
 .all-holdings-value-sub {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.66rem;
   white-space: nowrap;
 }
 
@@ -1761,29 +1766,29 @@ tbody tr:hover {
 
 tbody td,
 tfoot td {
-  padding: 18px 16px;
+  padding: 12px 8px;
   text-align: right;
   vertical-align: middle;
 }
 
 .asset-name {
-  font-size: 1rem;
+  font-size: 0.84rem;
   font-weight: 700;
 }
 
 .metric {
   display: inline-flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .metric strong {
-  font-size: 0.98rem;
+  font-size: 0.84rem;
 }
 
 .metric span {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.66rem;
 }
 
 tfoot td {
@@ -2154,16 +2159,21 @@ tfoot td {
 
   .all-holdings-table tbody td:nth-child(8)::before,
   .all-holdings-table tfoot td:nth-child(8)::before {
-    content: "실현손익";
+    content: "미실현손익";
   }
 
   .all-holdings-table tbody td:nth-child(9)::before,
   .all-holdings-table tfoot td:nth-child(9)::before {
-    content: "누적배당";
+    content: "실현손익";
   }
 
   .all-holdings-table tbody td:nth-child(10)::before,
   .all-holdings-table tfoot td:nth-child(10)::before {
+    content: "누적배당";
+  }
+
+  .all-holdings-table tbody td:nth-child(11)::before,
+  .all-holdings-table tfoot td:nth-child(11)::before {
     content: "비중";
   }
 
