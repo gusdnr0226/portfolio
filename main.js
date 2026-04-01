@@ -703,6 +703,19 @@ function formatSignedPercentCompact(value) {
   return `${prefix}${weightPercentFormatter.format(value * 100)}%`;
 }
 
+function formatSignedPercentSingleDecimal(value) {
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${weightPercentFormatter.format(value * 100)}%`;
+}
+
+function formatProfitWithRateSingleDecimal(profitLoss, costBasis) {
+  if (costBasis <= 0) {
+    return formatSignedCurrency(profitLoss);
+  }
+
+  return `${formatSignedCurrency(profitLoss)} (${formatSignedPercentSingleDecimal(profitLoss / costBasis)})`;
+}
+
 function formatProfitWithRate(profitLoss, costBasis) {
   if (costBasis <= 0) {
     return formatSignedCurrency(profitLoss);
@@ -3185,7 +3198,7 @@ function renderPortfolioCircleChart(treemap) {
             chartLabel: `포트폴리오 평가금액 원형 차트: ${valueChartAriaLabel}`,
             segments,
             summaryValue: formatCurrency(treemap.totalAssets),
-            summaryNote: `TR ${formatSignedPercent(totalReturnRate)}`,
+            summaryNote: `TR ${formatSignedPercentSingleDecimal(totalReturnRate)}`,
           })}
           ${renderPortfolioCirclePlot({
             title: "Dividend",
@@ -3200,7 +3213,7 @@ function renderPortfolioCircleChart(treemap) {
           <div class="portfolio-circle-table">
             <div class="portfolio-circle-table-head">
               <span>카테고리</span>
-              <span>평가금액</span>
+              <span>평가금액/TR</span>
               <span>연 배당</span>
               <span>비중(금액/배당)</span>
             </div>
@@ -3219,7 +3232,7 @@ function renderPortfolioCircleChart(treemap) {
                       </div>
                       <div class="portfolio-circle-cell portfolio-circle-value">
                         <strong>${formatCurrency(group.marketValueBase)}</strong>
-                        <span class="portfolio-circle-value-sub ${getToneClass(group.totalReturnAmount)}">TR ${formatProfitWithRate(group.totalReturnAmount, group.costBasisBase)}</span>
+                        <span class="portfolio-circle-value-sub ${getToneClass(group.totalReturnAmount)}">${formatProfitWithRateSingleDecimal(group.totalReturnAmount, group.costBasisBase)}</span>
                       </div>
                       <div class="portfolio-circle-cell portfolio-circle-dividend">
                         <strong>${formatCurrency(group.dividendIncomeBase)}</strong>
@@ -3240,7 +3253,7 @@ function renderPortfolioCircleChart(treemap) {
               </div>
               <div class="portfolio-circle-cell portfolio-circle-value">
                 <strong>${formatCurrency(treemap.totalAssets)}</strong>
-                <span class="portfolio-circle-value-sub ${getToneClass(totalReturnAmount)}">TR ${formatProfitWithRate(totalReturnAmount, totalCostBasis)}</span>
+                <span class="portfolio-circle-value-sub ${getToneClass(totalReturnAmount)}">${formatProfitWithRateSingleDecimal(totalReturnAmount, totalCostBasis)}</span>
               </div>
               <div class="portfolio-circle-cell portfolio-circle-dividend">
                 <strong>${formatCurrency(totalDividendIncome)}</strong>
