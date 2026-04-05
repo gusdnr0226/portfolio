@@ -51,3 +51,33 @@ http://127.0.0.1:8000/
 - 정적 호스팅만 사용하면 브라우저 메모리에서만 바뀝니다. 이 경우 JSON 다운로드 파일을 직접 반영해야 합니다.
 - `trades` 시트가 포함된 같은 파일을 반복 업로드하면 거래가 다시 누적됩니다.
 - GitHub 커밋 후 GitHub Pages 재배포가 끝나야 새로고침 시 최신 `data/portfolios.json`이 내려옵니다.
+
+## Cloud Run 배포
+
+Node 서버 전체를 Cloud Run에 배포하면 `/api/portfolio/*`까지 함께 동작합니다.
+
+사전 조건:
+
+- `gcloud auth login`
+- `gcloud config set project monospace-6`
+
+배포:
+
+```bash
+bash scripts/deploy-cloud-run.sh
+```
+
+GitHub 자동 커밋까지 쓰려면 배포 전에 `GITHUB_TOKEN` 환경변수를 넣고 실행합니다.
+
+```bash
+GITHUB_TOKEN=ghp_xxx bash scripts/deploy-cloud-run.sh
+```
+
+기본 배포 값:
+
+- 프로젝트: `monospace-6`
+- 리전: `asia-northeast3`
+- 서비스명: `portfolio-app`
+- 시크릿명: `portfolio-github-token`
+
+필요하면 `PROJECT_ID`, `REGION`, `SERVICE_NAME` 환경변수로 덮어쓸 수 있습니다.

@@ -6,5 +6,8 @@
   "scripts": {
     "start": "node server.mjs",
     "dev": "node server.mjs"
+  },
+  "engines": {
+    "node": "20.x"
   }
 }

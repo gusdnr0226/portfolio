@@ -1,0 +1,14 @@
+.git
+.gitignore
+.gcloudignore
+.env
+.env.local
+.idx
+firebase-debug.log
+*.png
+*.jpg
+*.jpeg
+*.xlsx
+*.xls
+__pycache__/
+node_modules/
