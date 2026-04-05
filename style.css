@@ -293,6 +293,7 @@ body::before {
 .hero,
 .table-card,
 .overview-section,
+.workbook-sync-card,
 .treemap-card {
   position: relative;
   overflow: hidden;
@@ -308,6 +309,7 @@ body::before {
 .hero::after,
 .table-card::after,
 .overview-section::after,
+.workbook-sync-card::after,
 .treemap-card::after {
   content: "";
   position: absolute;
@@ -518,6 +520,129 @@ body::before {
 
 .overview-section {
   padding: 12px;
+}
+
+.workbook-sync-card {
+  margin: 0;
+}
+
+.workbook-sync-head {
+  align-items: flex-start;
+}
+
+.workbook-sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.workbook-sync-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 0 28px 18px;
+}
+
+.workbook-sync-stat {
+  display: grid;
+  gap: 8px;
+  padding: 18px 20px;
+  border: 1px solid rgba(126, 144, 171, 0.14);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(241, 247, 250, 0.96));
+}
+
+.workbook-sync-stat-label {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workbook-sync-stat-value {
+  font-size: 1.02rem;
+  letter-spacing: -0.02em;
+}
+
+.workbook-sync-stat-copy {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.workbook-sync-stat-copy code {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(111, 169, 216, 0.12);
+  font-size: 0.82rem;
+}
+
+.workbook-sync-note-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 28px 18px;
+}
+
+.workbook-sync-note {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 10px 14px;
+  border: 1px solid rgba(126, 144, 171, 0.14);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.workbook-sync-feedback {
+  margin: 0 28px 18px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(126, 144, 171, 0.16);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.workbook-sync-feedback strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.workbook-sync-feedback p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.workbook-sync-feedback.is-success {
+  border-color: rgba(92, 168, 147, 0.22);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 248, 243, 0.98));
+}
+
+.workbook-sync-feedback.is-error {
+  border-color: rgba(184, 111, 146, 0.22);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 241, 245, 0.98));
+}
+
+.workbook-sync-warning-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+}
+
+.workbook-sync-warning-list li + li {
+  margin-top: 4px;
+}
+
+.workbook-file-input {
+  display: none;
 }
 
 .overview-section-head,
@@ -1846,6 +1971,31 @@ tfoot td {
 
   .toolbar-actions .ghost-button {
     flex: 1 1 0;
+  }
+
+  .workbook-sync-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .workbook-sync-actions .ghost-button {
+    flex: 1 1 220px;
+  }
+
+  .workbook-sync-summary {
+    grid-template-columns: 1fr;
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+
+  .workbook-sync-note-list {
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+
+  .workbook-sync-feedback {
+    margin-left: 22px;
+    margin-right: 22px;
   }
 
   .treemap-card {

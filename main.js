@@ -2,6 +2,8 @@ const PORTFOLIOS_URL = "./data/portfolios.json";
 const LIVE_PRICES_URL = "./data/live-prices.json";
 const DIVIDENDS_URL = "./data/dividends.json";
 const DIVIDEND_CALENDAR_URL = "./data/dividend-calendar.json";
+const PORTFOLIO_SYNC_STATUS_URL = "./api/portfolio/sync-status";
+const PORTFOLIO_COMMIT_URL = "./api/portfolio/commit";
 const GITHUB_API_BASE_URL = "https://api.github.com/repos/gusdnr0226/portfolio";
 const GITHUB_LIVE_PRICES_URL =
   `${GITHUB_API_BASE_URL}/contents/data/live-prices.json?ref=main`;
@@ -292,9 +294,67 @@ const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
   timeStyle: "short",
   timeZone: "Asia/Seoul",
 });
+const WORKBOOK_SHEET_NAMES = {
+  guide: "README",
+  accounts: "accounts",
+  holdings: "holdings",
+  trades: "trades",
+};
+const WORKBOOK_SHEET_ALIASES = {
+  accounts: ["accounts", "account", "accountsheet", "계좌", "계좌목록"],
+  holdings: ["holdings", "holding", "positions", "보유종목", "종목", "포지션"],
+  trades: ["trades", "trade", "transactions", "거래내역", "거래", "체결내역"],
+};
+const WORKBOOK_EPSILON = 0.000001;
+const ACCOUNT_WORKBOOK_COLUMNS = [
+  { key: "accountId", label: "계좌ID", aliases: ["accountid", "account_id", "id"] },
+  { key: "accountName", label: "계좌명", aliases: ["accountname", "account_name", "계좌", "name"] },
+  { key: "cashKrw", label: "원화현금", aliases: ["cashkrw", "cash", "krwcash", "원화"] },
+  { key: "cashUsd", label: "달러현금", aliases: ["cashusd", "usdcash", "usd현금"] },
+  { key: "snapshotUsdKrw", label: "USDKRW환율", aliases: ["snapshotusdkrw", "usdkrw", "환율", "snapshotfx"] },
+  { key: "snapshotLabel", label: "스냅샷라벨", aliases: ["snapshotlabel", "label", "메모"] },
+];
+const HOLDING_WORKBOOK_COLUMNS = [
+  { key: "rowAction", label: "작업", aliases: ["action", "rowaction", "mode"] },
+  { key: "accountId", label: "계좌ID", aliases: ["accountid", "account_id"] },
+  { key: "accountName", label: "계좌명", aliases: ["accountname", "account_name", "계좌"] },
+  { key: "ticker", label: "티커", aliases: ["symbol", "종목코드", "code"] },
+  { key: "name", label: "종목명", aliases: ["holdingname", "assetname", "name"] },
+  { key: "type", label: "종목유형", aliases: ["assettype", "holdingtype", "type"] },
+  { key: "currency", label: "통화", aliases: ["ccy", "money"] },
+  { key: "quantity", label: "수량", aliases: ["qty", "shares"] },
+  { key: "averageCost", label: "평균단가", aliases: ["avgcost", "averageprice", "average_cost"] },
+  { key: "averageCostKrw", label: "평균단가(KRW)", aliases: ["avgcostkrw", "averagecostkrw", "krwavgcost"] },
+  { key: "costBasis", label: "총매입금액", aliases: ["totalcost", "cost", "costbasis"] },
+  { key: "snapshotPrice", label: "현재가스냅샷", aliases: ["snapshotprice", "currentprice", "price"] },
+  { key: "manualPriceOnly", label: "수동가격만", aliases: ["manualpriceonly", "manualprice", "manual"] },
+  { key: "realizedProfitLossKrw", label: "실현손익(KRW)", aliases: ["realizedpnl", "realizedprofitlosskrw", "실현손익"] },
+  { key: "cumulativeDividendIncomeKrw", label: "누적배당(KRW)", aliases: ["cumdividend", "cumulativedividendincomekrw", "누적배당"] },
+];
+const TRADE_WORKBOOK_COLUMNS = [
+  { key: "tradeDate", label: "거래일", aliases: ["date", "tradedate"] },
+  { key: "accountId", label: "계좌ID", aliases: ["accountid", "account_id"] },
+  { key: "accountName", label: "계좌명", aliases: ["accountname", "account_name", "계좌"] },
+  { key: "ticker", label: "티커", aliases: ["symbol", "종목코드", "code"] },
+  { key: "name", label: "종목명", aliases: ["holdingname", "assetname", "name", "종목"] },
+  { key: "side", label: "거래", aliases: ["side", "tradetype", "매수매도", "buyorsell"] },
+  { key: "quantity", label: "수량", aliases: ["qty", "shares"] },
+  { key: "unitPrice", label: "단가", aliases: ["price", "tradeprice", "unitprice"] },
+  { key: "currency", label: "통화", aliases: ["ccy", "money"] },
+  { key: "unitPriceKrw", label: "단가(KRW)", aliases: ["pricekrw", "unitpricekrw"] },
+  { key: "totalAmount", label: "총거래금액", aliases: ["amount", "total", "totalamount"] },
+  { key: "totalAmountKrw", label: "총거래금액(KRW)", aliases: ["amountkrw", "totalamountkrw"] },
+  { key: "exchangeRate", label: "환율", aliases: ["fx", "fxrate", "usdkrw"] },
+  { key: "type", label: "종목유형", aliases: ["assettype", "holdingtype", "type"] },
+  { key: "snapshotPrice", label: "현재가스냅샷", aliases: ["snapshotprice", "currentprice"] },
+  { key: "manualPriceOnly", label: "수동가격만", aliases: ["manualpriceonly", "manualprice", "manual"] },
+  { key: "realizedProfitLossKrwDelta", label: "실현손익증감(KRW)", aliases: ["realizeddelta", "realizedpnlkrwdelta"] },
+  { key: "cumulativeDividendIncomeKrwDelta", label: "누적배당증감(KRW)", aliases: ["cumdividenddelta", "cumulativedividenddelta"] },
+];
 
 const state = {
   portfolioSource: null,
+  basePortfolioSource: null,
   livePriceSource: null,
   liveExchangeRateSource: null,
   dividendSource: null,
@@ -302,10 +362,18 @@ const state = {
   dividendCalendarError: null,
   hideAmounts: loadAmountVisibilityPreference(),
   isRefreshing: false,
+  isImportingWorkbook: false,
+  isSavingPortfolioToServer: false,
+  hasLocalPortfolioChanges: false,
   refreshError: null,
   refreshPhase: null,
   refreshDetail: null,
   refreshTimerId: null,
+  workbookImportInfo: null,
+  workbookImportError: null,
+  portfolioSyncServerInfo: null,
+  portfolioCommitInfo: null,
+  portfolioCommitError: null,
 };
 let treemapTypographyFrameId = 0;
 let treemapResizeFrameId = 0;
@@ -345,6 +413,1217 @@ const treemapSuperCategoryLookup = Object.entries(SUPER_CATEGORY_RULES).reduce(
 const treemapCategoryOrderLookup = new Map(
   TREEMAP_LAYOUT_ORDER_GLOBAL.map((category, index) => [category, index]),
 );
+
+function normalizeWorkbookToken(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_./()\-]+/g, "");
+}
+
+function normalizeWorkbookLookupValue(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function normalizeTickerValue(value) {
+  const raw = String(value ?? "").trim();
+
+  if (!raw) {
+    return "";
+  }
+
+  const trimmed = raw.replace(/\.0+$/, "").toUpperCase();
+  return /^[0-9]+$/.test(trimmed) && trimmed.length < 6 ? trimmed.padStart(6, "0") : trimmed;
+}
+
+function createWorkbookColumnLookup(columns) {
+  return columns.reduce((lookup, column) => {
+    [column.key, column.label, ...(column.aliases ?? [])].forEach((value) => {
+      lookup.set(normalizeWorkbookToken(value), column.key);
+    });
+    return lookup;
+  }, new Map());
+}
+
+const accountWorkbookColumnLookup = createWorkbookColumnLookup(ACCOUNT_WORKBOOK_COLUMNS);
+const holdingWorkbookColumnLookup = createWorkbookColumnLookup(HOLDING_WORKBOOK_COLUMNS);
+const tradeWorkbookColumnLookup = createWorkbookColumnLookup(TRADE_WORKBOOK_COLUMNS);
+
+function getWorkbookLibrary() {
+  if (window.XLSX) {
+    return window.XLSX;
+  }
+
+  throw new Error("엑셀 라이브러리를 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 새로고침해 주세요.");
+}
+
+function deepClonePortfolioSource(source) {
+  return JSON.parse(JSON.stringify(source));
+}
+
+function createWorkbookFileStamp() {
+  const date = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}`;
+}
+
+function downloadBlob(fileName, blob) {
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => {
+    window.URL.revokeObjectURL(url);
+  }, 0);
+}
+
+function downloadTextFile(fileName, contents, type = "application/json") {
+  downloadBlob(fileName, new Blob([contents], { type }));
+}
+
+function formatWorkbookImportLabel(value = new Date()) {
+  return `${dateTimeFormatter.format(value)} 엑셀 업로드 반영`;
+}
+
+function hashWorkbookValue(value) {
+  return [...String(value ?? "")].reduce((accumulator, character) => {
+    return (accumulator * 31 + character.codePointAt(0)) >>> 0;
+  }, 7).toString(36);
+}
+
+function createWorkbookSafeId(prefix, value) {
+  const source = String(value ?? "").trim();
+  const slug = source
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+  const hash = hashWorkbookValue(source || prefix);
+
+  return slug ? `${prefix}-${slug}-${hash}`.slice(0, 40) : `${prefix}-${hash}`;
+}
+
+function parseWorkbookTextValue(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  return String(value).trim();
+}
+
+function parseWorkbookNumberValue(value) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const cleaned = value
+    .trim()
+    .replace(/,/g, "")
+    .replace(/원|₩|\$/g, "")
+    .replace(/\s+/g, "");
+
+  if (!cleaned) {
+    return null;
+  }
+
+  const numeric = Number(cleaned);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function parseWorkbookBooleanValue(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    if (value === 1) {
+      return true;
+    }
+
+    if (value === 0) {
+      return false;
+    }
+
+    return null;
+  }
+
+  const token = normalizeWorkbookToken(value);
+
+  if (!token) {
+    return null;
+  }
+
+  if (["y", "yes", "true", "1", "manual", "수동", "사용"].includes(token)) {
+    return true;
+  }
+
+  if (["n", "no", "false", "0", "auto", "자동", "미사용"].includes(token)) {
+    return false;
+  }
+
+  return null;
+}
+
+function parseWorkbookSideValue(value) {
+  const token = normalizeWorkbookToken(value);
+
+  if (["buy", "b", "매수", "+"].includes(token)) {
+    return "BUY";
+  }
+
+  if (["sell", "s", "매도", "-"].includes(token)) {
+    return "SELL";
+  }
+
+  return null;
+}
+
+function parseWorkbookRowAction(value) {
+  const token = normalizeWorkbookToken(value);
+
+  if (!token) {
+    return null;
+  }
+
+  if (["delete", "remove", "del", "삭제", "지움"].includes(token)) {
+    return "DELETE";
+  }
+
+  if (["upsert", "update", "edit", "add", "유지", "수정", "추가"].includes(token)) {
+    return "UPSERT";
+  }
+
+  return null;
+}
+
+function roundQuantityValue(value) {
+  return Number(Number(value).toFixed(6));
+}
+
+function roundCurrencyValue(value, currency = "KRW") {
+  if (!Number.isFinite(value)) {
+    return value;
+  }
+
+  return currency === "USD" ? Number(Number(value).toFixed(2)) : Math.round(value);
+}
+
+function roundPriceValue(value, currency = "KRW") {
+  if (!Number.isFinite(value)) {
+    return value;
+  }
+
+  return currency === "USD" ? Number(Number(value).toFixed(2)) : Math.round(value);
+}
+
+function roundExchangeRateValue(value) {
+  if (!Number.isFinite(value)) {
+    return value;
+  }
+
+  return Number(Number(value).toFixed(4));
+}
+
+function resolveWorkbookCurrency(value, fallbackTicker, fallbackHolding = null) {
+  const token = parseWorkbookTextValue(value).toUpperCase();
+
+  if (token === "USD" || token === "US$") {
+    return "USD";
+  }
+
+  if (token === "KRW" || token === "KR" || token === "원화") {
+    return "KRW";
+  }
+
+  if (fallbackHolding) {
+    return getHoldingCurrency(fallbackHolding);
+  }
+
+  return /^[0-9]/.test(fallbackTicker ?? "") ? "KRW" : "USD";
+}
+
+function getLiveUsdKrwRate() {
+  const liveRate =
+    state.liveExchangeRateSource?.quotes?.["KRW=X"]?.price ??
+    state.livePriceSource?.quotes?.["KRW=X"]?.price;
+
+  return Number.isFinite(liveRate) ? liveRate : null;
+}
+
+function resolveWorkbookUsdKrwRate(account, row, unitPrice = null, totalAmount = null) {
+  const explicitRate = parseWorkbookNumberValue(row?.exchangeRate);
+
+  if (Number.isFinite(explicitRate) && explicitRate > 0) {
+    return explicitRate;
+  }
+
+  const unitPriceKrw = parseWorkbookNumberValue(row?.unitPriceKrw);
+
+  if (Number.isFinite(unitPriceKrw) && Number.isFinite(unitPrice) && unitPrice > 0) {
+    return unitPriceKrw / unitPrice;
+  }
+
+  const totalAmountKrw = parseWorkbookNumberValue(row?.totalAmountKrw);
+
+  if (Number.isFinite(totalAmountKrw) && Number.isFinite(totalAmount) && totalAmount > 0) {
+    return totalAmountKrw / totalAmount;
+  }
+
+  if (Number.isFinite(account?.snapshotUsdKrw) && account.snapshotUsdKrw > 0) {
+    return account.snapshotUsdKrw;
+  }
+
+  const liveRate = getLiveUsdKrwRate();
+  return Number.isFinite(liveRate) && liveRate > 0 ? liveRate : 1;
+}
+
+function setHoldingCurrency(holding, currency) {
+  if (currency === "USD") {
+    holding.currency = "USD";
+    return;
+  }
+
+  delete holding.currency;
+}
+
+function trimHoldingPrecision(holding, currency) {
+  holding.quantity = roundQuantityValue(Number(holding.quantity ?? 0));
+  holding.costBasis = roundCurrencyValue(Number(holding.costBasis ?? 0), currency);
+  holding.snapshotPrice = roundPriceValue(Number(holding.snapshotPrice ?? 0), currency);
+  holding.realizedProfitLossKrw = roundCurrencyValue(Number(holding.realizedProfitLossKrw ?? 0), "KRW");
+  holding.cumulativeDividendIncomeKrw = roundCurrencyValue(
+    Number(holding.cumulativeDividendIncomeKrw ?? 0),
+    "KRW",
+  );
+
+  if (Number.isFinite(holding.averageCostKrw) && holding.averageCostKrw > 0) {
+    holding.averageCostKrw = roundCurrencyValue(holding.averageCostKrw, "KRW");
+  } else {
+    delete holding.averageCostKrw;
+  }
+
+  if (holding.manualPriceOnly) {
+    holding.manualPriceOnly = true;
+  } else {
+    delete holding.manualPriceOnly;
+  }
+
+  const nextName = parseWorkbookTextValue(holding.name);
+  holding.name = nextName || holding.ticker;
+
+  const nextType = parseWorkbookTextValue(holding.type);
+  holding.type = nextType || holding.type || "자산";
+
+  setHoldingCurrency(holding, currency);
+
+  return holding;
+}
+
+function findWorkbookSheetName(workbook, sheetKey) {
+  const aliases = [
+    WORKBOOK_SHEET_NAMES[sheetKey],
+    ...(WORKBOOK_SHEET_ALIASES[sheetKey] ?? []),
+  ].map((value) => normalizeWorkbookToken(value));
+
+  return workbook.SheetNames.find((sheetName) => {
+    return aliases.includes(normalizeWorkbookToken(sheetName));
+  }) ?? null;
+}
+
+function findWorkbookSheetByHeaderMatch(workbook, columnLookup, minimumMatches = 2) {
+  const XLSX = getWorkbookLibrary();
+  let bestSheetName = null;
+  let bestMatchCount = 0;
+
+  workbook.SheetNames.forEach((sheetName) => {
+    if (normalizeWorkbookToken(sheetName) === normalizeWorkbookToken(WORKBOOK_SHEET_NAMES.guide)) {
+      return;
+    }
+
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
+      header: 1,
+      defval: "",
+      raw: true,
+      blankrows: false,
+    });
+    const headers = rows[0] ?? [];
+    const matchCount = headers.reduce((count, header) => {
+      return count + (columnLookup.has(normalizeWorkbookToken(header)) ? 1 : 0);
+    }, 0);
+
+    if (matchCount > bestMatchCount) {
+      bestMatchCount = matchCount;
+      bestSheetName = sheetName;
+    }
+  });
+
+  return bestMatchCount >= minimumMatches ? bestSheetName : null;
+}
+
+function isWorkbookRowEmpty(row) {
+  return Object.entries(row).every(([key, value]) => {
+    if (key === "__rowNumber") {
+      return true;
+    }
+
+    if (typeof value === "number") {
+      return !Number.isFinite(value);
+    }
+
+    return parseWorkbookTextValue(value) === "";
+  });
+}
+
+function getWorkbookRows(workbook, sheetKey, columnLookup) {
+  let sheetName = findWorkbookSheetName(workbook, sheetKey);
+
+  if (!sheetName && sheetKey === "holdings") {
+    sheetName = findWorkbookSheetByHeaderMatch(workbook, columnLookup, 3);
+  }
+
+  if (!sheetName) {
+    return [];
+  }
+
+  const XLSX = getWorkbookLibrary();
+  const sheet = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    defval: "",
+    raw: true,
+    blankrows: false,
+  });
+
+  if (rows.length <= 1) {
+    return [];
+  }
+
+  const headerKeys = rows[0].map((header) => {
+    return columnLookup.get(normalizeWorkbookToken(header)) ?? null;
+  });
+
+  return rows.slice(1).map((values, index) => {
+    const mapped = { __rowNumber: index + 2 };
+
+    values.forEach((value, columnIndex) => {
+      const key = headerKeys[columnIndex];
+
+      if (key) {
+        mapped[key] = value;
+      }
+    });
+
+    return mapped;
+  }).filter((row) => !isWorkbookRowEmpty(row));
+}
+
+function createImportSummary() {
+  return {
+    accountRows: 0,
+    holdingRows: 0,
+    deletedHoldingRows: 0,
+    tradeRows: 0,
+    buyTrades: 0,
+    sellTrades: 0,
+    touchedAccountIds: new Set(),
+    warnings: [],
+    matchedSheetCount: 0,
+  };
+}
+
+function markWorkbookAccountTouched(summary, account) {
+  if (account?.id) {
+    summary.touchedAccountIds.add(account.id);
+  }
+}
+
+function ensureWorkbookAccountId(accounts, baseId) {
+  let candidate = baseId;
+  let suffix = 2;
+
+  while (accounts.some((account) => account.id === candidate)) {
+    candidate = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+
+  return candidate;
+}
+
+function resolveWorkbookAccount(source, row, { createIfMissing = false } = {}) {
+  const accountId = parseWorkbookTextValue(row.accountId);
+  const accountName = parseWorkbookTextValue(row.accountName);
+  const accountNameToken = normalizeWorkbookLookupValue(accountName);
+
+  let account = null;
+
+  if (accountId) {
+    account = source.accounts.find((entry) => entry.id === accountId) ?? null;
+  }
+
+  if (!account && accountNameToken) {
+    account = source.accounts.find((entry) => {
+      return normalizeWorkbookLookupValue(entry.name) === accountNameToken;
+    }) ?? null;
+  }
+
+  if (account || !createIfMissing) {
+    return account;
+  }
+
+  const baseId = accountId || createWorkbookSafeId("account", accountName || "portfolio");
+  const nextAccount = {
+    id: ensureWorkbookAccountId(source.accounts, baseId),
+    name: accountName || accountId || baseId,
+    snapshotLabel: formatWorkbookImportLabel(new Date()),
+    cash: 0,
+    holdings: [],
+  };
+
+  source.accounts.push(nextAccount);
+  return nextAccount;
+}
+
+function resolveWorkbookHoldingIndex(account, row) {
+  const ticker = normalizeTickerValue(row.ticker);
+  const nameToken = normalizeWorkbookLookupValue(row.name);
+
+  if (ticker) {
+    const byTickerIndex = account.holdings.findIndex((holding) => {
+      return normalizeTickerValue(holding.ticker) === ticker;
+    });
+
+    if (byTickerIndex >= 0) {
+      return byTickerIndex;
+    }
+  }
+
+  if (nameToken) {
+    return account.holdings.findIndex((holding) => {
+      return normalizeWorkbookLookupValue(holding.name) === nameToken;
+    });
+  }
+
+  return -1;
+}
+
+function createWorkbookHolding(account, row) {
+  const ticker = normalizeTickerValue(row.ticker);
+
+  if (!ticker) {
+    return null;
+  }
+
+  const name = parseWorkbookTextValue(row.name);
+  const currency = resolveWorkbookCurrency(row.currency, ticker);
+  const nextHolding = {
+    ticker,
+    name: name || ticker,
+    type: parseWorkbookTextValue(row.type) || "자산",
+    quantity: 0,
+    costBasis: 0,
+    snapshotPrice: 0,
+    realizedProfitLossKrw: 0,
+    cumulativeDividendIncomeKrw: 0,
+  };
+
+  if (!name) {
+    nextHolding.nameInferred = true;
+  }
+
+  setHoldingCurrency(nextHolding, currency);
+  if (currency === "USD" && Number.isFinite(account.snapshotUsdKrw) && account.snapshotUsdKrw > 0) {
+    nextHolding.averageCostKrw = null;
+  }
+
+  return nextHolding;
+}
+
+function resolveWorkbookHolding(account, row, { createIfMissing = false } = {}) {
+  const holdingIndex = resolveWorkbookHoldingIndex(account, row);
+
+  if (holdingIndex >= 0) {
+    return {
+      holding: account.holdings[holdingIndex],
+      index: holdingIndex,
+      isNew: false,
+    };
+  }
+
+  if (!createIfMissing) {
+    return {
+      holding: null,
+      index: -1,
+      isNew: false,
+    };
+  }
+
+  const nextHolding = createWorkbookHolding(account, row);
+
+  return {
+    holding: nextHolding,
+    index: -1,
+    isNew: true,
+  };
+}
+
+function buildWorkbookRowError(sheetKey, row, message) {
+  return new Error(`${sheetKey} 시트 ${row.__rowNumber}행: ${message}`);
+}
+
+function appendWorkbookSnapshotLabel(account, importLabel) {
+  const currentLabel = parseWorkbookTextValue(account.snapshotLabel);
+
+  if (!currentLabel) {
+    account.snapshotLabel = importLabel;
+    return;
+  }
+
+  if (!currentLabel.includes(importLabel)) {
+    account.snapshotLabel = `${currentLabel}, ${importLabel}`;
+  }
+}
+
+function applyWorkbookAccountRows(source, rows, summary) {
+  rows.forEach((row) => {
+    const account = resolveWorkbookAccount(source, row, { createIfMissing: true });
+
+    if (!account) {
+      throw buildWorkbookRowError("accounts", row, "계좌를 찾지 못했습니다.");
+    }
+
+    const nextName = parseWorkbookTextValue(row.accountName);
+    const nextSnapshotLabel = parseWorkbookTextValue(row.snapshotLabel);
+    const nextCashKrw = parseWorkbookNumberValue(row.cashKrw);
+    const nextCashUsd = parseWorkbookNumberValue(row.cashUsd);
+    const nextSnapshotUsdKrw = parseWorkbookNumberValue(row.snapshotUsdKrw);
+
+    if (nextName) {
+      account.name = nextName;
+    }
+
+    if (Number.isFinite(nextCashKrw)) {
+      account.cash = roundCurrencyValue(nextCashKrw, "KRW");
+    }
+
+    if (Number.isFinite(nextCashUsd)) {
+      account.cashUsd = roundCurrencyValue(nextCashUsd, "USD");
+    }
+
+    if (Number.isFinite(nextSnapshotUsdKrw) && nextSnapshotUsdKrw > 0) {
+      account.snapshotUsdKrw = roundExchangeRateValue(nextSnapshotUsdKrw);
+    }
+
+    if (nextSnapshotLabel) {
+      account.snapshotLabel = nextSnapshotLabel;
+    }
+
+    summary.accountRows += 1;
+    markWorkbookAccountTouched(summary, account);
+  });
+}
+
+function applyWorkbookHoldingRows(source, rows, summary) {
+  rows.forEach((row) => {
+    const action = parseWorkbookRowAction(row.rowAction);
+    const requestedQuantity = parseWorkbookNumberValue(row.quantity);
+    const shouldDelete =
+      action === "DELETE" ||
+      (Number.isFinite(requestedQuantity) && Math.abs(requestedQuantity) <= WORKBOOK_EPSILON);
+    const account = resolveWorkbookAccount(source, row, { createIfMissing: !shouldDelete });
+
+    if (!account) {
+      throw buildWorkbookRowError("holdings", row, "계좌ID 또는 계좌명을 확인해 주세요.");
+    }
+
+    const resolvedHolding = resolveWorkbookHolding(account, row, { createIfMissing: !shouldDelete });
+
+    if (!resolvedHolding.holding && shouldDelete) {
+      summary.warnings.push(`holdings ${row.__rowNumber}행: 삭제 대상 종목을 찾지 못해 건너뛰었습니다.`);
+      return;
+    }
+
+    if (!resolvedHolding.holding) {
+      throw buildWorkbookRowError("holdings", row, "신규 종목은 티커를 포함해야 합니다.");
+    }
+
+    if (shouldDelete) {
+      account.holdings.splice(resolvedHolding.index, 1);
+      summary.deletedHoldingRows += 1;
+      markWorkbookAccountTouched(summary, account);
+      return;
+    }
+
+    const existingHolding = resolvedHolding.holding;
+    const currency = resolveWorkbookCurrency(row.currency, row.ticker, existingHolding);
+    const nextTicker = normalizeTickerValue(row.ticker) || existingHolding.ticker;
+    const nextQuantity = Number.isFinite(requestedQuantity)
+      ? requestedQuantity
+      : Number(existingHolding.quantity ?? 0);
+
+    if (!Number.isFinite(nextQuantity) || nextQuantity <= WORKBOOK_EPSILON) {
+      throw buildWorkbookRowError("holdings", row, "수량은 0보다 큰 숫자여야 합니다.");
+    }
+
+    const providedAverageCost = parseWorkbookNumberValue(row.averageCost);
+    const providedCostBasis = parseWorkbookNumberValue(row.costBasis);
+    const existingAverageCost = getHoldingAverageCost(existingHolding);
+    let nextCostBasis = providedCostBasis;
+
+    if (!Number.isFinite(nextCostBasis)) {
+      const averageCost = Number.isFinite(providedAverageCost) ? providedAverageCost : existingAverageCost;
+
+      if (Number.isFinite(averageCost)) {
+        nextCostBasis = averageCost * nextQuantity;
+      }
+    }
+
+    if (!Number.isFinite(nextCostBasis)) {
+      throw buildWorkbookRowError("holdings", row, "평균단가 또는 총매입금액 중 하나는 필요합니다.");
+    }
+
+    const providedAverageCostKrw = parseWorkbookNumberValue(row.averageCostKrw);
+    let nextAverageCostKrw = providedAverageCostKrw;
+
+    if (!Number.isFinite(nextAverageCostKrw) && Number.isFinite(existingHolding.averageCostKrw)) {
+      nextAverageCostKrw = existingHolding.averageCostKrw;
+    }
+
+    if (!Number.isFinite(nextAverageCostKrw) && currency === "USD" && nextQuantity > WORKBOOK_EPSILON) {
+      const usdKrwRate = Number.isFinite(account.snapshotUsdKrw) && account.snapshotUsdKrw > 0
+        ? account.snapshotUsdKrw
+        : getLiveUsdKrwRate() ?? 1;
+      nextAverageCostKrw = (nextCostBasis * usdKrwRate) / nextQuantity;
+    }
+
+    let nextSnapshotPrice = parseWorkbookNumberValue(row.snapshotPrice);
+
+    if (!Number.isFinite(nextSnapshotPrice) || nextSnapshotPrice <= 0) {
+      nextSnapshotPrice = Number(existingHolding.snapshotPrice);
+    }
+
+    if (!Number.isFinite(nextSnapshotPrice) || nextSnapshotPrice <= 0) {
+      nextSnapshotPrice = nextCostBasis / nextQuantity;
+    }
+
+    const nextRealized = parseWorkbookNumberValue(row.realizedProfitLossKrw);
+    const nextDividend = parseWorkbookNumberValue(row.cumulativeDividendIncomeKrw);
+    const manualPriceOnly = parseWorkbookBooleanValue(row.manualPriceOnly);
+    const nextName = parseWorkbookTextValue(row.name) || existingHolding.name || nextTicker;
+    const nextType = parseWorkbookTextValue(row.type) || existingHolding.type || "자산";
+    const nextHolding = {
+      ...existingHolding,
+      ticker: nextTicker,
+      name: nextName,
+      type: nextType,
+      quantity: nextQuantity,
+      costBasis: nextCostBasis,
+      snapshotPrice: nextSnapshotPrice,
+      realizedProfitLossKrw: Number.isFinite(nextRealized)
+        ? nextRealized
+        : Number(existingHolding.realizedProfitLossKrw ?? 0),
+      cumulativeDividendIncomeKrw: Number.isFinite(nextDividend)
+        ? nextDividend
+        : Number(existingHolding.cumulativeDividendIncomeKrw ?? 0),
+    };
+
+    if (Number.isFinite(nextAverageCostKrw) && currency === "USD") {
+      nextHolding.averageCostKrw = nextAverageCostKrw;
+    } else if (Number.isFinite(providedAverageCostKrw)) {
+      nextHolding.averageCostKrw = providedAverageCostKrw;
+    } else if (currency !== "USD") {
+      delete nextHolding.averageCostKrw;
+    }
+
+    if (manualPriceOnly === true || manualPriceOnly === false) {
+      nextHolding.manualPriceOnly = manualPriceOnly;
+    }
+
+    if (parseWorkbookTextValue(row.name)) {
+      delete nextHolding.nameInferred;
+    } else if (!existingHolding.name && nextName === nextTicker) {
+      nextHolding.nameInferred = true;
+    }
+
+    trimHoldingPrecision(nextHolding, currency);
+
+    if (resolvedHolding.isNew) {
+      account.holdings.push(nextHolding);
+    } else {
+      account.holdings[resolvedHolding.index] = nextHolding;
+    }
+
+    summary.holdingRows += 1;
+    markWorkbookAccountTouched(summary, account);
+  });
+}
+
+function calculateWorkbookTradeTotalAmount(row, quantity) {
+  const totalAmount = parseWorkbookNumberValue(row.totalAmount);
+  const unitPrice = parseWorkbookNumberValue(row.unitPrice);
+
+  if (Number.isFinite(totalAmount)) {
+    return totalAmount;
+  }
+
+  if (Number.isFinite(unitPrice)) {
+    return quantity * unitPrice;
+  }
+
+  return null;
+}
+
+function calculateWorkbookTradeUnitPrice(row, quantity, totalAmount) {
+  const unitPrice = parseWorkbookNumberValue(row.unitPrice);
+
+  if (Number.isFinite(unitPrice)) {
+    return unitPrice;
+  }
+
+  if (Number.isFinite(totalAmount) && quantity > 0) {
+    return totalAmount / quantity;
+  }
+
+  return null;
+}
+
+function calculateWorkbookTradeTotalAmountKrw(row, quantity, totalAmount, unitPrice, currency, usdKrwRate) {
+  const explicitTotalAmountKrw = parseWorkbookNumberValue(row.totalAmountKrw);
+
+  if (Number.isFinite(explicitTotalAmountKrw)) {
+    return explicitTotalAmountKrw;
+  }
+
+  const explicitUnitPriceKrw = parseWorkbookNumberValue(row.unitPriceKrw);
+
+  if (Number.isFinite(explicitUnitPriceKrw)) {
+    return explicitUnitPriceKrw * quantity;
+  }
+
+  if (currency === "USD") {
+    return totalAmount * usdKrwRate;
+  }
+
+  if (Number.isFinite(unitPrice)) {
+    return unitPrice * quantity;
+  }
+
+  return totalAmount;
+}
+
+function applyWorkbookTradeRows(source, rows, summary) {
+  rows.forEach((row) => {
+    const side = parseWorkbookSideValue(row.side);
+
+    if (!side) {
+      throw buildWorkbookRowError("trades", row, "거래 값은 매수 또는 매도여야 합니다.");
+    }
+
+    const quantity = parseWorkbookNumberValue(row.quantity);
+
+    if (!Number.isFinite(quantity) || quantity <= WORKBOOK_EPSILON) {
+      throw buildWorkbookRowError("trades", row, "수량은 0보다 큰 숫자여야 합니다.");
+    }
+
+    const account = resolveWorkbookAccount(source, row, { createIfMissing: side === "BUY" });
+
+    if (!account) {
+      throw buildWorkbookRowError("trades", row, "계좌ID 또는 계좌명을 확인해 주세요.");
+    }
+
+    const resolvedHolding = resolveWorkbookHolding(account, row, { createIfMissing: side === "BUY" });
+
+    if (!resolvedHolding.holding) {
+      throw buildWorkbookRowError("trades", row, "매도 대상 종목을 찾지 못했습니다.");
+    }
+
+    const existingHolding = resolvedHolding.holding;
+    const currency = resolveWorkbookCurrency(row.currency, row.ticker, existingHolding);
+    const totalAmount = calculateWorkbookTradeTotalAmount(row, quantity);
+    const unitPrice = calculateWorkbookTradeUnitPrice(row, quantity, totalAmount);
+
+    if (!Number.isFinite(totalAmount) || !Number.isFinite(unitPrice)) {
+      throw buildWorkbookRowError("trades", row, "단가 또는 총거래금액이 필요합니다.");
+    }
+
+    const usdKrwRate = currency === "USD"
+      ? resolveWorkbookUsdKrwRate(account, row, unitPrice, totalAmount)
+      : 1;
+    const totalAmountKrw = calculateWorkbookTradeTotalAmountKrw(
+      row,
+      quantity,
+      totalAmount,
+      unitPrice,
+      currency,
+      usdKrwRate,
+    );
+    const realizedDeltaOverride = parseWorkbookNumberValue(row.realizedProfitLossKrwDelta);
+    const cumulativeDividendDelta = parseWorkbookNumberValue(row.cumulativeDividendIncomeKrwDelta) ?? 0;
+    const existingQuantity = Number(existingHolding.quantity ?? 0);
+    const existingCostBasis = Number(existingHolding.costBasis ?? 0);
+
+    if (!Number.isFinite(existingQuantity) || !Number.isFinite(existingCostBasis)) {
+      throw buildWorkbookRowError("trades", row, "기존 종목의 수량 또는 총매입금액을 읽지 못했습니다.");
+    }
+
+    const existingAverageCost = existingQuantity > WORKBOOK_EPSILON
+      ? existingCostBasis / existingQuantity
+      : 0;
+    const existingAverageCostKrw = getHoldingAverageCostKrw(existingHolding);
+    const nextTicker = normalizeTickerValue(row.ticker) || existingHolding.ticker;
+    const nextName = parseWorkbookTextValue(row.name) || existingHolding.name || nextTicker;
+    const nextType = parseWorkbookTextValue(row.type) || existingHolding.type || "자산";
+    let nextSnapshotPrice = parseWorkbookNumberValue(row.snapshotPrice);
+
+    if (!Number.isFinite(nextSnapshotPrice) || nextSnapshotPrice <= 0) {
+      nextSnapshotPrice = Number(existingHolding.snapshotPrice);
+    }
+
+    if (!Number.isFinite(nextSnapshotPrice) || nextSnapshotPrice <= 0) {
+      nextSnapshotPrice = unitPrice;
+    }
+
+    const manualPriceOnly = parseWorkbookBooleanValue(row.manualPriceOnly);
+    const nextHolding = {
+      ...existingHolding,
+      ticker: nextTicker,
+      name: nextName,
+      type: nextType,
+      snapshotPrice: nextSnapshotPrice,
+      realizedProfitLossKrw: Number(existingHolding.realizedProfitLossKrw ?? 0),
+      cumulativeDividendIncomeKrw: Number(existingHolding.cumulativeDividendIncomeKrw ?? 0),
+    };
+
+    if (manualPriceOnly === true || manualPriceOnly === false) {
+      nextHolding.manualPriceOnly = manualPriceOnly;
+    }
+
+    if (parseWorkbookTextValue(row.name)) {
+      delete nextHolding.nameInferred;
+    } else if (!existingHolding.name && nextName === nextTicker) {
+      nextHolding.nameInferred = true;
+    }
+
+    if (side === "BUY") {
+      const nextQuantity = existingQuantity + quantity;
+      const nextCostBasis = existingCostBasis + totalAmount;
+      const existingCostBasisKrw = Number.isFinite(existingAverageCostKrw)
+        ? existingAverageCostKrw * existingQuantity
+        : currency === "USD"
+          ? existingCostBasis * usdKrwRate
+          : existingCostBasis;
+      const nextAverageCostKrw = currency === "USD" && nextQuantity > WORKBOOK_EPSILON
+        ? (existingCostBasisKrw + totalAmountKrw) / nextQuantity
+        : null;
+
+      nextHolding.quantity = nextQuantity;
+      nextHolding.costBasis = nextCostBasis;
+      nextHolding.realizedProfitLossKrw += Number.isFinite(realizedDeltaOverride)
+        ? realizedDeltaOverride
+        : 0;
+      nextHolding.cumulativeDividendIncomeKrw += cumulativeDividendDelta;
+
+      if (Number.isFinite(nextAverageCostKrw)) {
+        nextHolding.averageCostKrw = nextAverageCostKrw;
+      }
+    } else {
+      if (existingQuantity <= WORKBOOK_EPSILON) {
+        throw buildWorkbookRowError("trades", row, "보유 수량이 0인 종목은 매도할 수 없습니다.");
+      }
+
+      if (quantity - existingQuantity > WORKBOOK_EPSILON) {
+        throw buildWorkbookRowError(
+          "trades",
+          row,
+          `매도 수량 ${quantityFormatter.format(quantity)}이 현재 보유 수량 ${quantityFormatter.format(existingQuantity)}을 초과합니다.`,
+        );
+      }
+
+      const removedCostBasis = existingAverageCost * quantity;
+      const removedCostBasisKrw = Number.isFinite(existingAverageCostKrw)
+        ? existingAverageCostKrw * quantity
+        : currency === "USD"
+          ? removedCostBasis * usdKrwRate
+          : removedCostBasis;
+      const realizedDelta = Number.isFinite(realizedDeltaOverride)
+        ? realizedDeltaOverride
+        : totalAmountKrw - removedCostBasisKrw;
+      const nextQuantity = existingQuantity - quantity;
+      const nextCostBasis = nextQuantity > WORKBOOK_EPSILON ? existingCostBasis - removedCostBasis : 0;
+
+      nextHolding.quantity = nextQuantity;
+      nextHolding.costBasis = Math.max(nextCostBasis, 0);
+      nextHolding.realizedProfitLossKrw += realizedDelta;
+      nextHolding.cumulativeDividendIncomeKrw += cumulativeDividendDelta;
+
+      if (Number.isFinite(existingAverageCostKrw) && nextQuantity > WORKBOOK_EPSILON) {
+        nextHolding.averageCostKrw = existingAverageCostKrw;
+      } else if (nextQuantity <= WORKBOOK_EPSILON) {
+        delete nextHolding.averageCostKrw;
+      }
+    }
+
+    trimHoldingPrecision(nextHolding, currency);
+
+    if (nextHolding.quantity <= WORKBOOK_EPSILON) {
+      if (!resolvedHolding.isNew && resolvedHolding.index >= 0) {
+        account.holdings.splice(resolvedHolding.index, 1);
+        summary.deletedHoldingRows += 1;
+      }
+    } else if (resolvedHolding.isNew) {
+      account.holdings.push(nextHolding);
+    } else {
+      account.holdings[resolvedHolding.index] = nextHolding;
+    }
+
+    summary.tradeRows += 1;
+    summary[side === "BUY" ? "buyTrades" : "sellTrades"] += 1;
+    markWorkbookAccountTouched(summary, account);
+  });
+}
+
+function finalizeWorkbookImport(source, summary, fileName) {
+  const importLabel = formatWorkbookImportLabel(new Date());
+
+  source.accounts.forEach((account) => {
+    if (!Array.isArray(account.holdings)) {
+      account.holdings = [];
+    }
+
+    account.holdings = account.holdings.filter((holding) => {
+      return Number(holding.quantity ?? 0) > WORKBOOK_EPSILON;
+    });
+
+    if (!Number.isFinite(account.cash)) {
+      account.cash = 0;
+    }
+
+    account.cash = roundCurrencyValue(account.cash, "KRW");
+
+    if (Number.isFinite(account.cashUsd) && Math.abs(account.cashUsd) > WORKBOOK_EPSILON) {
+      account.cashUsd = roundCurrencyValue(account.cashUsd, "USD");
+    } else {
+      delete account.cashUsd;
+    }
+
+    if (Number.isFinite(account.snapshotUsdKrw) && account.snapshotUsdKrw > 0) {
+      account.snapshotUsdKrw = roundExchangeRateValue(account.snapshotUsdKrw);
+    } else {
+      delete account.snapshotUsdKrw;
+    }
+
+    if (summary.touchedAccountIds.has(account.id)) {
+      appendWorkbookSnapshotLabel(account, importLabel);
+    }
+  });
+
+  source.meta = {
+    ...(source.meta ?? {}),
+    workbookLastImportedAt: new Date().toISOString(),
+    workbookLastImportedFileName: fileName,
+  };
+
+  return {
+    appliedAt: source.meta.workbookLastImportedAt,
+    fileName,
+    accountRows: summary.accountRows,
+    holdingRows: summary.holdingRows,
+    deletedHoldingRows: summary.deletedHoldingRows,
+    tradeRows: summary.tradeRows,
+    buyTrades: summary.buyTrades,
+    sellTrades: summary.sellTrades,
+    touchedAccountCount: summary.touchedAccountIds.size,
+    warnings: summary.warnings.slice(0, 6),
+  };
+}
+
+function serializeWorkbookCellValue(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Y" : "";
+  }
+
+  return value;
+}
+
+function buildWorkbookSheetRows(columns, rows) {
+  return [
+    columns.map((column) => column.label),
+    ...rows.map((row) => columns.map((column) => serializeWorkbookCellValue(row[column.key]))),
+  ];
+}
+
+function buildWorkbookGuideRows(source) {
+  return [
+    ["포트폴리오 엑셀 업데이트 가이드"],
+    ["생성시각", dateTimeFormatter.format(new Date())],
+    ["기준 계좌 수", source.accounts.length],
+    [],
+    ["시트", "용도", "핵심 컬럼", "처리 순서"],
+    ["accounts", "계좌 현금/환율/스냅샷 라벨 직접 수정", "계좌ID, 계좌명, 원화현금, 달러현금, USDKRW환율", 1],
+    ["holdings", "보유 수량/평단/실현손익/누적배당 직접 수정 또는 종목 추가/삭제", "작업, 계좌ID, 티커, 수량, 평균단가, 평균단가(KRW), 총매입금액", 2],
+    ["trades", "매수/매도 거래를 순서대로 누적 반영", "거래, 수량, 단가, 환율 또는 단가(KRW)", 3],
+    [],
+    ["규칙", "holdings 시트에서 작업이 DELETE 이거나 수량이 0이면 해당 종목을 제거합니다."],
+    ["규칙", "holdings 시트는 행 단위 upsert입니다. 같은 계좌ID+티커 조합을 갱신하고, 없으면 새 종목을 추가합니다."],
+    ["규칙", "trades 시트는 위에서 정리된 현재 화면 데이터 기준으로 순서대로 적용됩니다. 같은 파일을 다시 올리면 거래가 중복 적용될 수 있습니다."],
+    ["규칙", "USD 종목의 평균단가(KRW)는 평균단가(KRW), 단가(KRW), 총거래금액(KRW), 환율 순서로 우선 사용합니다."],
+    ["저장", "정적 사이트라 업로드 결과는 브라우저 메모리에만 반영됩니다. 유지하려면 업로드 후 JSON 다운로드로 portfolios.json을 교체해 주세요."],
+  ];
+}
+
+function buildPortfolioWorkbook(source) {
+  const XLSX = getWorkbookLibrary();
+  const workbook = XLSX.utils.book_new();
+  const accountRows = source.accounts.map((account) => ({
+    accountId: account.id,
+    accountName: account.name,
+    cashKrw: Number(account.cash ?? 0),
+    cashUsd: Number(account.cashUsd ?? "") || "",
+    snapshotUsdKrw: Number(account.snapshotUsdKrw ?? "") || "",
+    snapshotLabel: account.snapshotLabel ?? "",
+  }));
+  const holdingRows = source.accounts.flatMap((account) => {
+    return account.holdings.map((holding) => ({
+      rowAction: "",
+      accountId: account.id,
+      accountName: account.name,
+      ticker: holding.ticker,
+      name: holding.name,
+      type: holding.type,
+      currency: getHoldingCurrency(holding),
+      quantity: Number(holding.quantity ?? 0),
+      averageCost: getHoldingAverageCost(holding),
+      averageCostKrw: Number(holding.averageCostKrw ?? "") || "",
+      costBasis: Number(holding.costBasis ?? 0),
+      snapshotPrice: Number(holding.snapshotPrice ?? "") || "",
+      manualPriceOnly: Boolean(holding.manualPriceOnly),
+      realizedProfitLossKrw: Number(holding.realizedProfitLossKrw ?? 0),
+      cumulativeDividendIncomeKrw: Number(holding.cumulativeDividendIncomeKrw ?? 0),
+    }));
+  });
+
+  const guideSheet = XLSX.utils.aoa_to_sheet(buildWorkbookGuideRows(source));
+  const accountsSheet = XLSX.utils.aoa_to_sheet(buildWorkbookSheetRows(ACCOUNT_WORKBOOK_COLUMNS, accountRows));
+  const holdingsSheet = XLSX.utils.aoa_to_sheet(buildWorkbookSheetRows(HOLDING_WORKBOOK_COLUMNS, holdingRows));
+  const tradesSheet = XLSX.utils.aoa_to_sheet(buildWorkbookSheetRows(TRADE_WORKBOOK_COLUMNS, []));
+
+  guideSheet["!cols"] = [{ wch: 18 }, { wch: 110 }, { wch: 62 }, { wch: 12 }];
+  accountsSheet["!cols"] = ACCOUNT_WORKBOOK_COLUMNS.map((column) => ({
+    wch: Math.max(column.label.length * 1.6, 16),
+  }));
+  holdingsSheet["!cols"] = HOLDING_WORKBOOK_COLUMNS.map((column) => ({
+    wch: Math.max(column.label.length * 1.4, 15),
+  }));
+  tradesSheet["!cols"] = TRADE_WORKBOOK_COLUMNS.map((column) => ({
+    wch: Math.max(column.label.length * 1.4, 15),
+  }));
+
+  XLSX.utils.book_append_sheet(workbook, guideSheet, WORKBOOK_SHEET_NAMES.guide);
+  XLSX.utils.book_append_sheet(workbook, accountsSheet, WORKBOOK_SHEET_NAMES.accounts);
+  XLSX.utils.book_append_sheet(workbook, holdingsSheet, WORKBOOK_SHEET_NAMES.holdings);
+  XLSX.utils.book_append_sheet(workbook, tradesSheet, WORKBOOK_SHEET_NAMES.trades);
+
+  return workbook;
+}
+
+function downloadPortfolioWorkbook() {
+  if (!state.portfolioSource) {
+    return;
+  }
+
+  const XLSX = getWorkbookLibrary();
+  const workbook = buildPortfolioWorkbook(state.portfolioSource);
+  XLSX.writeFile(workbook, `portfolio-update-${createWorkbookFileStamp()}.xlsx`);
+}
+
+function downloadPortfolioJson() {
+  if (!state.portfolioSource) {
+    return;
+  }
+
+  const contents = `${JSON.stringify(state.portfolioSource, null, 2)}\n`;
+  downloadTextFile(`portfolios-${createWorkbookFileStamp()}.json`, contents);
+}
+
+async function importPortfolioWorkbook(file) {
+  const XLSX = getWorkbookLibrary();
+  const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+  const nextSource = deepClonePortfolioSource(state.portfolioSource ?? state.basePortfolioSource);
+
+  if (!nextSource?.accounts) {
+    throw new Error("현재 포트폴리오 데이터가 준비되지 않았습니다.");
+  }
+
+  const summary = createImportSummary();
+  const accountRows = getWorkbookRows(workbook, "accounts", accountWorkbookColumnLookup);
+  const holdingRows = getWorkbookRows(workbook, "holdings", holdingWorkbookColumnLookup);
+  const tradeRows = getWorkbookRows(workbook, "trades", tradeWorkbookColumnLookup);
+
+  if (findWorkbookSheetName(workbook, "accounts") || accountRows.length) {
+    summary.matchedSheetCount += 1;
+  }
+
+  if (findWorkbookSheetName(workbook, "holdings") || holdingRows.length) {
+    summary.matchedSheetCount += 1;
+  }
+
+  if (findWorkbookSheetName(workbook, "trades") || tradeRows.length) {
+    summary.matchedSheetCount += 1;
+  }
+
+  if (summary.matchedSheetCount === 0) {
+    throw new Error("accounts, holdings, trades 시트를 찾지 못했습니다.");
+  }
+
+  applyWorkbookAccountRows(nextSource, accountRows, summary);
+  applyWorkbookHoldingRows(nextSource, holdingRows, summary);
+  applyWorkbookTradeRows(nextSource, tradeRows, summary);
+
+  if (
+    summary.accountRows === 0 &&
+    summary.holdingRows === 0 &&
+    summary.tradeRows === 0 &&
+    summary.deletedHoldingRows === 0
+  ) {
+    throw new Error("업로드할 데이터 행이 없습니다. 헤더 아래에 값을 입력해 주세요.");
+  }
+
+  return {
+    source: nextSource,
+    info: finalizeWorkbookImport(nextSource, summary, file.name),
+  };
+}
+
+function resetPortfolioSourceToBase() {
+  if (!state.basePortfolioSource) {
+    return;
+  }
+
+  state.portfolioSource = deepClonePortfolioSource(state.basePortfolioSource);
+  state.hasLocalPortfolioChanges = false;
+  state.workbookImportInfo = null;
+  state.workbookImportError = null;
+  state.portfolioCommitError = null;
+  renderCurrentBook();
+}
 
 function loadAmountVisibilityPreference() {
   try {
@@ -830,6 +2109,119 @@ async function fetchText(url, options = {}) {
   }
 
   return response.text();
+}
+
+function isPortfolioSyncServerEnabled() {
+  return Boolean(state.portfolioSyncServerInfo?.enabled);
+}
+
+function getPortfolioSyncServerTargetLabel(info = state.portfolioSyncServerInfo) {
+  if (!info?.repoFullName) {
+    return "GitHub 자동 커밋 서버";
+  }
+
+  return `${info.repoFullName}@${info.branch}:${info.path}`;
+}
+
+function isAutoPortfolioServerCommitEnabled() {
+  return isPortfolioSyncServerEnabled() && state.portfolioSyncServerInfo?.autoCommitOnUpload !== false;
+}
+
+async function loadPortfolioSyncServerInfo() {
+  const requestUrl = new URL(PORTFOLIO_SYNC_STATUS_URL, window.location.href);
+  requestUrl.searchParams.set("ts", `${Date.now()}`);
+
+  try {
+    const response = await fetch(requestUrl, { cache: "no-store" });
+
+    if (response.status === 404) {
+      return {
+        checked: true,
+        enabled: false,
+        mode: "download-only",
+        reason: "api-unavailable",
+      };
+    }
+
+    if (!response.ok) {
+      throw new Error(`포트폴리오 동기화 서버 상태 확인 실패 (${response.status})`);
+    }
+
+    const data = await response.json();
+    return {
+      checked: true,
+      enabled: Boolean(data?.enabled),
+      mode: data?.mode ?? (data?.enabled ? "github-commit" : "download-only"),
+      reason: data?.reason ?? null,
+      repoFullName: data?.repoFullName ?? null,
+      branch: data?.branch ?? null,
+      path: data?.path ?? null,
+      autoCommitOnUpload: data?.autoCommitOnUpload !== false,
+    };
+  } catch (error) {
+    return {
+      checked: true,
+      enabled: false,
+      mode: "download-only",
+      reason: getErrorMessage(error),
+    };
+  }
+}
+
+async function commitPortfolioSourceToServer(source, options = {}) {
+  const response = await fetch(PORTFOLIO_COMMIT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      portfolioSource: source,
+      sourceFileName: options.sourceFileName ?? null,
+      workbookImportInfo: options.workbookImportInfo ?? null,
+      requestedAt: new Date().toISOString(),
+    }),
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      payload?.message ?? `포트폴리오 GitHub 반영 실패 (${response.status})`,
+    );
+  }
+
+  return payload;
+}
+
+async function syncPortfolioSourceToServer(options = {}) {
+  if (!isPortfolioSyncServerEnabled()) {
+    throw new Error("GitHub 자동 커밋 서버가 활성화되어 있지 않습니다.");
+  }
+
+  const source = options.source ?? state.portfolioSource;
+
+  if (!source) {
+    throw new Error("반영할 포트폴리오 데이터가 없습니다.");
+  }
+
+  state.isSavingPortfolioToServer = true;
+  state.portfolioCommitError = null;
+  renderCurrentBook();
+
+  try {
+    const result = await commitPortfolioSourceToServer(source, options);
+    state.portfolioCommitInfo = result;
+    state.portfolioCommitError = null;
+    state.basePortfolioSource = deepClonePortfolioSource(source);
+    state.hasLocalPortfolioChanges = false;
+    return result;
+  } catch (error) {
+    state.portfolioCommitError = error;
+    throw error;
+  } finally {
+    state.isSavingPortfolioToServer = false;
+    renderCurrentBook();
+  }
 }
 
 function isAutomaticLivePriceSource(livePriceSource) {
@@ -3949,6 +5341,14 @@ function renderSidebarNavigation(book) {
               </a>
               <a
                 class="sidebar-nav-link is-subitem"
+                href="#workbook-sync"
+                data-section-link
+                data-section-target="workbook-sync"
+              >
+                <span>Workbook</span>
+              </a>
+              <a
+                class="sidebar-nav-link is-subitem"
                 href="#dashboard-treemap"
                 data-section-link
                 data-section-target="dashboard-treemap"
@@ -4078,6 +5478,187 @@ function hydrateSidebarNavigation() {
   setSidebarActiveSection(sections[0].id);
 }
 
+function renderWorkbookSyncSection() {
+  const workbookLibraryReady = Boolean(window.XLSX);
+  const importInfo = state.workbookImportInfo;
+  const serverInfo = state.portfolioSyncServerInfo;
+  const serverEnabled = Boolean(serverInfo?.enabled);
+  const importErrorMessage = state.workbookImportError
+    ? escapeHtml(state.workbookImportError.message ?? String(state.workbookImportError))
+    : "";
+  const commitErrorMessage = state.portfolioCommitError
+    ? escapeHtml(state.portfolioCommitError.message ?? String(state.portfolioCommitError))
+    : "";
+  const lastImportedAt = importInfo?.appliedAt ? formatUpdatedAt(importInfo.appliedAt) : "아직 업로드 없음";
+  const summaryText = importInfo
+    ? `계좌 ${importInfo.accountRows}행 · 보유종목 ${importInfo.holdingRows}행 · 거래 ${importInfo.tradeRows}행`
+    : "직접 수정과 거래내역 누적 반영을 모두 지원합니다.";
+  const localStateLabel = state.hasLocalPortfolioChanges ? "브라우저 임시 반영 중" : "파일 기준 상태";
+  const warningMarkup = importInfo?.warnings?.length
+    ? `
+        <ul class="workbook-sync-warning-list">
+          ${importInfo.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}
+        </ul>
+      `
+    : "";
+  const serverTargetLabel = getPortfolioSyncServerTargetLabel(serverInfo);
+  const syncStateLabel = !serverInfo
+    ? "서버 상태 확인 중"
+    : serverEnabled
+      ? "서버 자동 커밋 활성화"
+      : "브라우저 임시 반영";
+  const syncStateCopy = !serverInfo
+    ? "업로드 후 자동 GitHub 반영 가능 여부를 확인하고 있습니다."
+    : serverEnabled
+      ? `${escapeHtml(serverTargetLabel)} 대상으로 업로드 직후 자동 반영합니다.`
+      : serverInfo?.reason === "missing-token"
+        ? "서버는 떠 있지만 GITHUB_TOKEN이 없어 자동 커밋은 비활성화되어 있습니다."
+        : "정적 사이트라 유지하려면 업로드 후 JSON 다운로드 파일로 data/portfolios.json을 교체해야 합니다.";
+  const lastCommitAt = state.portfolioCommitInfo?.committedAt
+    ? formatUpdatedAt(state.portfolioCommitInfo.committedAt)
+    : serverEnabled
+      ? "아직 서버 반영 없음"
+      : "서버 미연결";
+  const lastCommitSummary = state.portfolioCommitInfo
+    ? state.portfolioCommitInfo.skipped
+      ? "GitHub 저장소와 동일해서 새 커밋 없이 동기화 상태만 정리했습니다."
+      : `${escapeHtml(serverTargetLabel)} 반영 완료`
+    : serverEnabled
+      ? "엑셀 업로드 후 GitHub 커밋을 자동 시도합니다."
+      : "서버가 없으면 현재 브라우저에서만 바뀌고 파일은 자동 저장되지 않습니다.";
+  const commitButtonLabel = state.isSavingPortfolioToServer
+    ? "GitHub 반영 중..."
+    : state.hasLocalPortfolioChanges
+      ? "GitHub 반영"
+      : "GitHub 동기화됨";
+  const commitLinkMarkup = state.portfolioCommitInfo?.commitUrl
+    ? `<a class="workbook-sync-link" href="${escapeHtml(state.portfolioCommitInfo.commitUrl)}" target="_blank" rel="noreferrer">커밋 보기</a>`
+    : "";
+
+  return `
+    <section class="workbook-sync-card sidebar-anchor-section" id="workbook-sync" data-nav-section>
+      <div class="section-head workbook-sync-head">
+        <div>
+          <h2 class="section-title">엑셀 동기화</h2>
+          <p class="section-copy">
+            현재 포트폴리오를 엑셀로 내려받아 <strong>accounts</strong>, <strong>holdings</strong>,
+            <strong>trades</strong> 시트를 수정한 뒤 다시 업로드하면 브라우저에서 즉시 반영합니다.
+            서버가 함께 배포되어 있으면 업로드된 결과를 <strong>GitHub의 data/portfolios.json</strong>까지 자동 커밋합니다.
+          </p>
+        </div>
+        <div class="workbook-sync-actions">
+          <button class="ghost-button" data-download-workbook ${workbookLibraryReady ? "" : "disabled"}>
+            현재 데이터 엑셀 다운로드
+          </button>
+          <button class="ghost-button" data-download-portfolio-json>
+            현재 JSON 다운로드
+          </button>
+          <button class="ghost-button" data-upload-workbook ${workbookLibraryReady && !state.isImportingWorkbook ? "" : "disabled"}>
+            ${state.isImportingWorkbook ? "엑셀 업로드 중..." : "엑셀 업로드"}
+          </button>
+          ${serverEnabled ? `
+            <button
+              class="ghost-button ${state.hasLocalPortfolioChanges ? "" : "ghost-button-muted"}"
+              data-commit-portfolio-source
+              ${state.isSavingPortfolioToServer || !state.hasLocalPortfolioChanges ? "disabled" : ""}
+            >
+              ${commitButtonLabel}
+            </button>
+          ` : ""}
+          ${state.hasLocalPortfolioChanges ? `
+            <button class="ghost-button ghost-button-muted" data-reset-portfolio-source>
+              원본으로 복원
+            </button>
+          ` : ""}
+        </div>
+      </div>
+
+      <div class="workbook-sync-summary">
+        <article class="workbook-sync-stat">
+          <span class="workbook-sync-stat-label">지원 방식</span>
+          <strong class="workbook-sync-stat-value">직접 수정 + 거래 누적</strong>
+          <p class="workbook-sync-stat-copy">holdings는 스냅샷 upsert, trades는 순차 반영입니다.</p>
+        </article>
+        <article class="workbook-sync-stat">
+          <span class="workbook-sync-stat-label">최근 업로드</span>
+          <strong class="workbook-sync-stat-value">${escapeHtml(lastImportedAt)}</strong>
+          <p class="workbook-sync-stat-copy">${escapeHtml(summaryText)}</p>
+        </article>
+        <article class="workbook-sync-stat">
+          <span class="workbook-sync-stat-label">저장 방식</span>
+          <strong class="workbook-sync-stat-value">${escapeHtml(syncStateLabel)}</strong>
+          <p class="workbook-sync-stat-copy">${syncStateCopy}</p>
+        </article>
+        <article class="workbook-sync-stat">
+          <span class="workbook-sync-stat-label">최근 GitHub 반영</span>
+          <strong class="workbook-sync-stat-value">${escapeHtml(lastCommitAt)}</strong>
+          <p class="workbook-sync-stat-copy">${lastCommitSummary}</p>
+        </article>
+        <article class="workbook-sync-stat">
+          <span class="workbook-sync-stat-label">현재 편집 상태</span>
+          <strong class="workbook-sync-stat-value">${escapeHtml(localStateLabel)}</strong>
+          <p class="workbook-sync-stat-copy">${state.hasLocalPortfolioChanges ? "아직 GitHub나 원본 JSON에 저장되지 않은 로컬 변경이 있습니다." : "현재 화면 상태가 마지막 원본 또는 마지막 GitHub 반영 상태와 일치합니다."}</p>
+        </article>
+        <article class="workbook-sync-stat">
+          <span class="workbook-sync-stat-label">다운로드 백업</span>
+          <strong class="workbook-sync-stat-value">JSON + XLSX</strong>
+          <p class="workbook-sync-stat-copy">자동 반영이 실패해도 현재 상태를 바로 파일로 내려받아 백업할 수 있습니다.</p>
+        </article>
+      </div>
+
+      <div class="workbook-sync-note-list" aria-label="엑셀 입력 가이드">
+        <span class="workbook-sync-note">accounts: 현금, 환율, 스냅샷 라벨 직접 수정</span>
+        <span class="workbook-sync-note">holdings: 수량, 평균단가, 총매입금액, 실현손익, 누적배당 수정 또는 종목 삭제</span>
+        <span class="workbook-sync-note">trades: 매수/매도 수량과 단가로 누적 업데이트</span>
+        <span class="workbook-sync-note">server: 서버가 있으면 업로드 후 GitHub main 브랜치의 portfolios.json 자동 커밋</span>
+      </div>
+
+      ${!workbookLibraryReady ? `
+        <div class="workbook-sync-feedback is-error">
+          <strong>엑셀 라이브러리를 불러오지 못했습니다.</strong>
+          <p>네트워크 상태를 확인한 뒤 새로고침해 주세요.</p>
+        </div>
+      ` : ""}
+
+      ${state.workbookImportError ? `
+        <div class="workbook-sync-feedback is-error">
+          <strong>업로드 실패</strong>
+          <p>${importErrorMessage}</p>
+        </div>
+      ` : ""}
+
+      ${state.portfolioCommitError ? `
+        <div class="workbook-sync-feedback is-error">
+          <strong>GitHub 반영 실패</strong>
+          <p>${commitErrorMessage}</p>
+        </div>
+      ` : ""}
+
+      ${importInfo ? `
+        <div class="workbook-sync-feedback is-success">
+          <strong>${escapeHtml(importInfo.fileName ?? "업로드 완료")}</strong>
+          <p>
+            ${escapeHtml(
+              `계좌 ${importInfo.accountRows}행, 보유종목 ${importInfo.holdingRows}행, 삭제 ${importInfo.deletedHoldingRows}행, 거래 ${importInfo.tradeRows}행(${importInfo.buyTrades}건 매수 / ${importInfo.sellTrades}건 매도), ${importInfo.touchedAccountCount}개 계좌 반영`,
+            )}
+          </p>
+          ${warningMarkup}
+        </div>
+      ` : ""}
+
+      ${state.portfolioCommitInfo ? `
+        <div class="workbook-sync-feedback is-success">
+          <strong>${escapeHtml(state.portfolioCommitInfo.message ?? "GitHub 반영 완료")}</strong>
+          <p>${escapeHtml(state.portfolioCommitInfo.detail ?? lastCommitSummary)}</p>
+          ${commitLinkMarkup}
+        </div>
+      ` : ""}
+
+      <input class="workbook-file-input" type="file" accept=".xlsx,.xls" data-workbook-input />
+    </section>
+  `;
+}
+
 function renderApp(book) {
   const app = document.querySelector("#app");
 
@@ -4119,6 +5700,8 @@ function renderApp(book) {
             </div>
 
           </section>
+
+          ${renderWorkbookSyncSection()}
 
           ${renderPortfolioCircleChart(treemap)}
 
@@ -4225,10 +5808,17 @@ async function initializeApp() {
   renderLoading();
 
   try {
-    [state.portfolioSource, state.dividendSource] = await Promise.all([
+    const [portfolioSource, dividendSource] = await Promise.all([
       fetchJson(PORTFOLIOS_URL),
       fetchDividendData(),
     ]);
+    state.basePortfolioSource = deepClonePortfolioSource(portfolioSource);
+    state.portfolioSource = deepClonePortfolioSource(portfolioSource);
+    state.dividendSource = dividendSource;
+    state.workbookImportInfo = null;
+    state.workbookImportError = null;
+    state.hasLocalPortfolioChanges = false;
+
     try {
       state.dividendCalendarSource = await fetchDividendCalendarData();
       state.dividendCalendarError = null;
@@ -4236,14 +5826,15 @@ async function initializeApp() {
       state.dividendCalendarSource = null;
       state.dividendCalendarError = error;
     }
-    const externalTickers = getExternalQuoteTickers(state.portfolioSource);
 
-    const [livePriceResult, exchangeRateResult] = await Promise.allSettled([
+    const externalTickers = getExternalQuoteTickers(state.portfolioSource);
+    const [livePriceResult, exchangeRateResult, portfolioSyncServerResult] = await Promise.allSettled([
       loadLivePrices({
         includeRepo: true,
         externalTickers,
       }),
       loadLiveExchangeRateSource(),
+      loadPortfolioSyncServerInfo(),
     ]);
 
     if (livePriceResult.status === "fulfilled") {
@@ -4259,7 +5850,18 @@ async function initializeApp() {
       state.liveExchangeRateSource = null;
     }
 
-    renderApp(buildBookData(state.portfolioSource, state.livePriceSource, state.dividendSource));
+    if (portfolioSyncServerResult.status === "fulfilled") {
+      state.portfolioSyncServerInfo = portfolioSyncServerResult.value;
+    } else {
+      state.portfolioSyncServerInfo = {
+        checked: true,
+        enabled: false,
+        mode: "download-only",
+        reason: getErrorMessage(portfolioSyncServerResult.reason),
+      };
+    }
+
+    renderCurrentBook();
     startAutoRefresh();
   } catch (error) {
     renderError(error);
@@ -4276,6 +5878,57 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  const downloadWorkbookButton = event.target.closest("[data-download-workbook]");
+
+  if (downloadWorkbookButton) {
+    try {
+      state.workbookImportError = null;
+      downloadPortfolioWorkbook();
+    } catch (error) {
+      state.workbookImportError = error;
+      renderCurrentBook();
+    }
+    return;
+  }
+
+  const downloadJsonButton = event.target.closest("[data-download-portfolio-json]");
+
+  if (downloadJsonButton) {
+    state.workbookImportError = null;
+    downloadPortfolioJson();
+    return;
+  }
+
+  const uploadWorkbookButton = event.target.closest("[data-upload-workbook]");
+
+  if (uploadWorkbookButton) {
+    const workbookInput = document.querySelector("[data-workbook-input]");
+    workbookInput?.click();
+    return;
+  }
+
+  const commitPortfolioButton = event.target.closest("[data-commit-portfolio-source]");
+
+  if (commitPortfolioButton) {
+    if (!state.portfolioSource || !state.hasLocalPortfolioChanges || state.isSavingPortfolioToServer) {
+      return;
+    }
+
+    void syncPortfolioSourceToServer({
+      source: state.portfolioSource,
+      sourceFileName: state.workbookImportInfo?.fileName ?? null,
+      workbookImportInfo: state.workbookImportInfo,
+    }).catch(() => {});
+    return;
+  }
+
+  const resetPortfolioButton = event.target.closest("[data-reset-portfolio-source]");
+
+  if (resetPortfolioButton) {
+    resetPortfolioSourceToBase();
+    return;
+  }
+
   const refreshButton = event.target.closest("[data-refresh-quotes]");
 
   if (!refreshButton) {
@@ -4288,6 +5941,52 @@ document.addEventListener("click", (event) => {
   }
 
   refreshLivePrices();
+});
+
+document.addEventListener("change", async (event) => {
+  const workbookInput = event.target.closest("[data-workbook-input]");
+
+  if (!workbookInput) {
+    return;
+  }
+
+  const file = workbookInput.files?.[0];
+  workbookInput.value = "";
+
+  if (!file) {
+    return;
+  }
+
+  state.isImportingWorkbook = true;
+  state.workbookImportError = null;
+  state.portfolioCommitError = null;
+  state.portfolioCommitInfo = null;
+  renderCurrentBook();
+
+  try {
+    const result = await importPortfolioWorkbook(file);
+    state.portfolioSource = result.source;
+    state.hasLocalPortfolioChanges = true;
+    state.workbookImportInfo = result.info;
+    state.workbookImportError = null;
+
+    if (isAutoPortfolioServerCommitEnabled()) {
+      try {
+        await syncPortfolioSourceToServer({
+          source: result.source,
+          sourceFileName: file.name,
+          workbookImportInfo: result.info,
+        });
+      } catch (error) {
+        // Keep the imported data in memory so the user can retry or download it.
+      }
+    }
+  } catch (error) {
+    state.workbookImportError = error;
+  } finally {
+    state.isImportingWorkbook = false;
+    renderCurrentBook();
+  }
 });
 
 window.addEventListener("resize", () => {
